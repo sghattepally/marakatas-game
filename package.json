@@ -1,0 +1,20 @@
+{
+  "name": "marakatas-game",
+  "version": "0.1.0",
+  "description": "The Marakatas - A tactical RPG set in the Loka Verse",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "keywords": ["game", "phaser", "tactical", "rpg", "indian-mythology"],
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "phaser": "^3.80.1"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0"
+  }
+}

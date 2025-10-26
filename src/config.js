@@ -2,8 +2,8 @@ import Phaser from 'phaser';
 
 export const GameConfig = {
   type: Phaser.AUTO,
-  width: 1920,
-  height: 1080,
+  width: 1280,
+  height: 720,
   parent: 'game-container',
   backgroundColor: '#2d2d2d',
   scene: [], // We'll add scenes in main.js

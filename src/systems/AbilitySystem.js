@@ -228,21 +228,22 @@ export class AbilitySystem {
         };
       }
 
-       if (ability.range === 'speed') {
-  effectiveRange = actor.remainingSpeed;  // ← Use a local variable instead
+ let effectiveRange;
+if (ability.range === 'speed') {
+  effectiveRange = actor.remainingSpeed;
 } else {
   effectiveRange = ability.range;
 }
 
-  const distance = calculateDistance(actor.x, actor.y, target.x, target.y);
-      if (distance > ability.range) {
-        return {
-          valid: false,
-          message: `Target out of range (max ${ability.range} squares).`,
-          target: null,
-          position: null
-        };
-      }
+const distance = calculateDistance(actor.x, actor.y, target.x, target.y);
+if (distance > effectiveRange) {  // ← Use effectiveRange, not ability.range
+  return {
+    valid: false,
+    message: `Target out of range (max ${effectiveRange} squares).`,
+    target: null,
+    position: null
+  };
+}
       
       return {
         valid: true,
@@ -321,35 +322,74 @@ export class AbilitySystem {
    * Returns event log entry
    */
   applyDamageEffect(actor, target, ability) {
-    // Parse damage dice
-    const diceSpec = parseDiceNotation(ability.damageDice);
+  // Step 1: Attack Roll (if it's an attack)
+  if (ability.requiresAttackRoll !== false) {  // Default to true
+    const attackRoll = Phaser.Math.Between(1, 20);
+    const attackModifier = actor.character.getModifier(actor.character.dakshata); // Dexterity for attacks
+    const attackTotal = attackRoll + attackModifier;
     
-    // Roll damage
-    let totalDamage = rollDice(diceSpec);
+    // Calculate target's evasion (10 + Dakshata modifier)
+    const targetEvasion = 10 + target.character.getModifier(target.character.dakshata);
     
-    // Add attribute modifier if specified
-    if (ability.damageAttribute) {
-      const modifier = actor.character.getModifier(
-        actor.character[ability.damageAttribute]
-      );
-      totalDamage += modifier;
+    console.log(`Attack roll: ${attackRoll} + ${attackModifier} = ${attackTotal} vs Evasion ${targetEvasion}`);
+    
+    // Critical miss
+    if (attackRoll === 1) {
+      return {
+        eventType: 'miss',
+        actor: actor.character.name,
+        target: target.character.name,
+        ability: ability.name,
+        message: 'Critical miss!',
+        damage: 0
+      };
     }
     
-    // Apply damage to target
-    const actualDamage = target.takeDamage(totalDamage);
-    actor.damageDealt += actualDamage;
+    // Critical hit
+    if (attackRoll === 20) {
+      console.log('CRITICAL HIT!');
+      // Double damage dice (not modifiers)
+    }
     
-    // Log entry
-    return {
-      eventType: 'damage',
-      actor: actor.character.name,
-      target: target.character.name,
-      ability: ability.name,
-      damage: actualDamage,
-      targetStatus: target.status,
-      remainingPrana: target.currentPrana
-    };
+    // Miss
+    if (attackTotal < targetEvasion && attackRoll !== 20) {
+      return {
+        eventType: 'miss',
+        actor: actor.character.name,
+        target: target.character.name,
+        ability: ability.name,
+        message: `${actor.character.name} misses ${target.character.name}!`,
+        damage: 0
+      };
+    }
   }
+  
+  // Step 2: Roll damage (only if hit)
+  const diceSpec = parseDiceNotation(ability.damageDice);
+  let totalDamage = rollDice(diceSpec);
+  
+  // Add attribute modifier
+  if (ability.damageAttribute) {
+    const modifier = actor.character.getModifier(
+      actor.character[ability.damageAttribute]
+    );
+    totalDamage += modifier;
+  }
+  
+  // Step 3: Apply damage
+  const actualDamage = target.takeDamage(totalDamage);
+  actor.damageDealt += actualDamage;
+  
+  return {
+    eventType: 'damage',
+    actor: actor.character.name,
+    target: target.character.name,
+    ability: ability.name,
+    damage: actualDamage,
+    targetStatus: target.status,
+    remainingPrana: target.currentPrana
+  };
+}
   
   /**
    * Apply healing effect to a target

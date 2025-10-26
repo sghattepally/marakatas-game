@@ -244,7 +244,6 @@ export const ABILITY_DATABASE = {
  */
 export const CLASS_ABILITIES = {
   'Dhanurdhara': [  // Archer/Marksman
-    'basic_move', 
     'blowpipe_shot',
     'rapid_fire',
     'precision_shot',
@@ -252,7 +251,6 @@ export const CLASS_ABILITIES = {
     'tactical_repositioning'
   ],
   'Yodha': [        // Warrior
-    'basic_move', 
     'basic_strike',
     'power_attack',
     'intimidating_shout',
@@ -260,7 +258,6 @@ export const CLASS_ABILITIES = {
     'first_aid'
   ],
   'Chara': [        // Scout/Defender
-    'basic_move', 
     'shield_bash',
     'shield_ward',
     'quick_movement',
@@ -268,7 +265,6 @@ export const CLASS_ABILITIES = {
     'first_aid'
   ],
   'Rishi': [        // Mystic/Healer
-    'basic_move', 
     'healing_herbs',
     'tactical_repositioning',
     'first_aid'

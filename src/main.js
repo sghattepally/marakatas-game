@@ -18,8 +18,8 @@ const game = new Phaser.Game(GameConfig);
 window.game = game;
 
 console.log('╔════════════════════════════════════════════╗');
-console.log('║     THE MARAKATAS - Game Initialized      ║');
-console.log('║          Pirates of the Loka Verse        ║');
+console.log('║     THE MARAKATAS - Game Initialized       ║');
+console.log('║          Pirates of the Loka Verse         ║');
 console.log('╚════════════════════════════════════════════╝');
 console.log('Phaser Version:', Phaser.VERSION);
 console.log('Scene Order: BootScene → MainMenu → MissionSelect → MissionScene');

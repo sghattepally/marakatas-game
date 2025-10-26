@@ -73,7 +73,6 @@ export default class MissionSceneIsometric extends Phaser.Scene {
     
     // Create background (dark ocean/night)
     this.createBackground();
-    
     // Initialize isometric grid (20x10 for merchant ship)
     this.grid = new IsometricGrid(this, 20, 10, {
       tileWidth: 64,
@@ -707,25 +706,22 @@ export default class MissionSceneIsometric extends Phaser.Scene {
 createCombatLogPanel() {
   const { width } = this.cameras.main;
   
-  // Panel dimensions
   const panelWidth = 600;
-  const panelHeight = 160; // Slightly taller
+  const panelHeight = 160;
   const panelX = width / 2;
   const panelY = 130;
   
-  // Semi-transparent background
   const logBg = this.add.rectangle(panelX, panelY, panelWidth, panelHeight, 0x0f172a, 0.92);
   logBg.setStrokeStyle(2, 0x334155);
   logBg.setDepth(300);
   
-  // Title with scroll hint
   const logTitle = this.add.text(panelX, panelY - panelHeight/2 + 15, '⚔️ COMBAT LOG (Scroll: ↑↓)', {
     fontSize: '13px',
     color: '#4ade80',
     fontStyle: 'bold'
   }).setOrigin(0.5).setDepth(301);
   
-  // Create a mask for the scrollable area
+  // Create mask for scrollable area
   const maskShape = this.make.graphics();
   maskShape.fillStyle(0xffffff);
   maskShape.fillRect(
@@ -734,25 +730,24 @@ createCombatLogPanel() {
     panelWidth - 20,
     panelHeight - 45
   );
-  
   const mask = maskShape.createGeometryMask();
   
-  // Log text container (this will scroll)
+  // FIXED: Container positioned at TOP of visible area
   this.logTextContainer = this.add.container(
     panelX - panelWidth/2 + 15,
-    panelY - panelHeight/2 + 40
+    panelY + panelHeight/2 - 10  // ← FIXED: Start from bottom, text grows upward
   );
   this.logTextContainer.setDepth(301);
   this.logTextContainer.setMask(mask);
   
-  // Actual text object inside container
+  // Text anchored to BOTTOM so new lines appear at bottom
   this.logText = this.add.text(0, 0, '', {
     fontSize: '12px',
     color: '#e2e8f0',
     lineSpacing: 6,
     wordWrap: { width: panelWidth - 30 },
     fontStyle: 'normal'
-  });
+  }).setOrigin(0, 1); // ← FIXED: Origin at bottom-left (0, 1)
   
   this.logTextContainer.add(this.logText);
   
@@ -769,7 +764,7 @@ createCombatLogPanel() {
   
   // Scroll state
   this.logScrollOffset = 0;
-  this.logLineHeight = 18; // Approximate height per line
+  this.logLineHeight = 18;
   
   // Mouse wheel scrolling
   this.input.on('wheel', (pointer, gameObjects, deltaX, deltaY, deltaZ) => {
@@ -779,7 +774,6 @@ createCombatLogPanel() {
     }
   });
   
-  // Keyboard scrolling (arrow keys)
   this.input.keyboard.on('keydown-UP', () => this.scrollCombatLog(-1));
   this.input.keyboard.on('keydown-DOWN', () => this.scrollCombatLog(1));
   
@@ -794,6 +788,7 @@ createCombatLogPanel() {
     scrollDownIndicator: this.logScrollDownIndicator
   };
 }
+
 
   createViewToggle() {
     const { width } = this.cameras.main;
@@ -928,23 +923,46 @@ updateScrollIndicators() {
     panel.collapseIcon.setText(panel.visible ? '›' : '‹');
   }
   
-  updateAllSpritePositions() {
-    for (const participantId in this.participantSprites) {
-      const data = this.participantSprites[participantId];
-      const participant = data.participant;
-      const screenPos = this.grid.gridToScreen(participant.x, participant.y);
-      const depth = this.grid.calculateDepth(participant.x, participant.y, 'units');
-      
-      data.sprite.setPosition(screenPos.x, screenPos.y).setDepth(depth);
-      data.shadow.setPosition(screenPos.x, screenPos.y + 30).setDepth(depth - 0.5);
-      data.nameText.setPosition(screenPos.x, screenPos.y - 45).setDepth(depth + 0.1);
-      data.healthBarBg.setPosition(screenPos.x, screenPos.y + 40).setDepth(depth + 0.1);
-      data.healthBar.setPosition(screenPos.x - 30, screenPos.y + 40).setDepth(depth + 0.1);
-      
-      data.screenX = screenPos.x;
-      data.screenY = screenPos.y;
-    }
+updateAllSpritePositions() {
+  // FIXED: Clear any active highlights before repositioning
+  this.grid.clearHighlights();
+  this.targetingMode = false;
+  this.movementMode = false;
+  
+  for (const participantId in this.participantSprites) {
+    const data = this.participantSprites[participantId];
+    const participant = data.participant;
+    const screenPos = this.grid.gridToScreen(participant.x, participant.y);
+    const depth = this.grid.calculateDepth(participant.x, participant.y, 'units');
+    
+    data.sprite.setPosition(screenPos.x, screenPos.y).setDepth(depth);
+    data.shadow.setPosition(screenPos.x, screenPos.y + 30).setDepth(depth - 0.5);
+    data.nameText.setPosition(screenPos.x, screenPos.y - 45).setDepth(depth + 0.1);
+    
+    // FIXED: Update health bar position AND recreate to avoid overflow
+    data.healthBarBg.setPosition(screenPos.x, screenPos.y + 40).setDepth(depth + 0.1);
+    
+    // Recreate health bar at new position with correct size
+    const healthPercent = participant.getHealthPercent() / 100;
+    const color = healthPercent > 0.5 ? 0x4ade80 : 
+                  healthPercent > 0.25 ? 0xfbbf24 : 0xef4444;
+    const barWidth = Math.max(0, Math.min(60, 60 * healthPercent));
+    
+    data.healthBar.destroy();
+    data.healthBar = this.add.rectangle(
+      screenPos.x - 30,
+      screenPos.y + 40,
+      barWidth,
+      6,
+      color
+    ).setOrigin(0, 0.5).setDepth(depth + 0.1);
+    
+    data.screenX = screenPos.x;
+    data.screenY = screenPos.y;
   }
+}
+
+
   
   // ==========================================
   // COMBAT FLOW
@@ -1040,10 +1058,9 @@ updateScrollIndicators() {
     panel.actionValues.setText(actions);
   }
   
-  updateAbilityPanel() {
+updateAbilityPanel() {
   const actor = this.gameSession.getCurrentActor();
   if (!actor || actor.team !== 'player') {
-    // Hide abilities for enemy turns
     for (const btnId in this.abilityButtons) {
       if (this.abilityButtons[btnId].destroy) {
         this.abilityButtons[btnId].destroy();
@@ -1053,12 +1070,10 @@ updateScrollIndicators() {
     return;
   }
   
-  // Show player abilities
   const abilities = actor.character.abilities.map(id => getAbility(id)).filter(a => a);
   const { width } = this.cameras.main;
   const panelX = width - 150;
   
-  // Clear old buttons
   for (const btnId in this.abilityButtons) {
     if (this.abilityButtons[btnId].destroy) {
       this.abilityButtons[btnId].destroy();
@@ -1066,83 +1081,94 @@ updateScrollIndicators() {
   }
   this.abilityButtons = {};
   
-  // Create ability buttons with color coding
   abilities.forEach((ability, index) => {
     const y = 120 + index * 60;
     const btnWidth = 260;
     const btnHeight = 50;
     
-    // Main button background
-    const btn = this.add.rectangle(panelX, y, btnWidth, btnHeight, 0x334155)
-      .setInteractive({ useHandCursor: true })
+    // FIXED: Check if ability is usable
+    const validation = this.abilitySystem.validateAbilityUse(actor, ability);
+    const isEnabled = validation.valid;
+    
+    // Button background (grayed if disabled)
+    const btn = this.add.rectangle(
+      panelX, y, btnWidth, btnHeight, 
+      isEnabled ? 0x334155 : 0x1e293b  // Darker when disabled
+    ).setInteractive({ useHandCursor: isEnabled })
       .setDepth(301);
     
-    // LEFT TRIM - Action Type Color
+    if (!isEnabled) {
+      btn.setAlpha(0.5); // Semi-transparent when disabled
+    }
+    
+    // Left trim - Action type (still show color when disabled)
     const actionColor = this.getActionTypeColor(ability.actionType);
     const leftTrim = this.add.rectangle(
-      panelX - btnWidth/2 + 3,
-      y,
-      6,
-      btnHeight - 4,
-      actionColor
-    ).setDepth(302);
+      panelX - btnWidth/2 + 3, y, 6, btnHeight - 4, actionColor
+    ).setDepth(302).setAlpha(isEnabled ? 1 : 0.4);
     
-    // RIGHT TRIM - Resource Type Color
+    // Right trim - Resource type (still show color when disabled)
     const resourceColor = this.getResourceTypeColor(ability.resourceType, ability.resourceCost);
     const rightTrim = this.add.rectangle(
-      panelX + btnWidth/2 - 3,
-      y,
-      6,
-      btnHeight - 4,
-      resourceColor
-    ).setDepth(302);
+      panelX + btnWidth/2 - 3, y, 6, btnHeight - 4, resourceColor
+    ).setDepth(302).setAlpha(isEnabled ? 1 : 0.4);
     
     // Ability name
     const nameText = this.add.text(panelX - 80, y - 10, ability.name, {
       fontSize: '14px',
-      color: '#ffffff',
+      color: isEnabled ? '#ffffff' : '#64748b',  // Gray text when disabled
       fontStyle: 'bold'
     }).setOrigin(0, 0.5).setDepth(302);
     
-    // Action type label (small)
+    // Action label
     const actionLabel = this.getActionTypeLabel(ability.actionType);
     const actionText = this.add.text(panelX - 80, y + 8, actionLabel, {
       fontSize: '10px',
-      color: '#94a3b8'
+      color: isEnabled ? '#94a3b8' : '#475569'  // Darker gray when disabled
     }).setOrigin(0, 0.5).setDepth(302);
     
-    // Resource cost (if any)
+    // Resource cost
     if (ability.resourceCost > 0) {
       const costLabel = this.getResourceCostLabel(ability.resourceType, ability.resourceCost);
       const costText = this.add.text(panelX + 110, y, costLabel, {
         fontSize: '13px',
-        color: this.getResourceTextColor(ability.resourceType),
+        color: isEnabled ? this.getResourceTextColor(ability.resourceType) : '#475569',
         fontStyle: 'bold'
       }).setOrigin(1, 0.5).setDepth(302);
       
       this.abilityButtons[ability.id + '_cost'] = costText;
     }
     
-    // Range indicator (small icon)
+    // Range indicator
     const rangeText = this.add.text(panelX + 90, y + 10, `⭘ ${ability.range}`, {
       fontSize: '9px',
-      color: '#64748b'
+      color: isEnabled ? '#64748b' : '#334155'
     }).setOrigin(1, 0.5).setDepth(302);
     
-    // Hover effects
-    btn.on('pointerover', () => {
-      btn.setFillStyle(0x475569);
-      leftTrim.setFillStyle(actionColor, 1);
-      rightTrim.setFillStyle(resourceColor, 1);
-    });
-    
-    btn.on('pointerout', () => {
-      btn.setFillStyle(0x334155);
-      leftTrim.setFillStyle(actionColor, 0.8);
-      rightTrim.setFillStyle(resourceColor, 0.8);
-    });
-    
-    btn.on('pointerdown', () => this.selectAbility(ability));
+    // FIXED: Only add hover/click if enabled
+    if (isEnabled) {
+      btn.on('pointerover', () => {
+        btn.setFillStyle(0x475569);
+        leftTrim.setAlpha(1);
+        rightTrim.setAlpha(1);
+      });
+      
+      btn.on('pointerout', () => {
+        btn.setFillStyle(0x334155);
+        leftTrim.setAlpha(0.8);
+        rightTrim.setAlpha(0.8);
+      });
+      
+      btn.on('pointerdown', () => this.selectAbility(ability));
+    } else {
+      // Show tooltip on hover explaining why it's disabled
+      btn.on('pointerover', () => {
+        this.showDisabledTooltip(validation.message, panelX, y);
+      });
+      btn.on('pointerout', () => {
+        this.hideDisabledTooltip();
+      });
+    }
     
     // Store all components
     this.abilityButtons[ability.id] = btn;
@@ -1152,6 +1178,28 @@ updateScrollIndicators() {
     this.abilityButtons[ability.id + '_leftTrim'] = leftTrim;
     this.abilityButtons[ability.id + '_rightTrim'] = rightTrim;
   });
+}
+
+// NEW: Show tooltip for disabled abilities
+showDisabledTooltip(message, x, y) {
+  if (!this.disabledTooltip) {
+    this.disabledTooltip = this.add.text(x, y - 35, message, {
+      fontSize: '11px',
+      color: '#ef4444',
+      backgroundColor: '#1e293b',
+      padding: { x: 8, y: 4 }
+    }).setOrigin(0.5).setDepth(400);
+  } else {
+    this.disabledTooltip.setText(message);
+    this.disabledTooltip.setPosition(x, y - 35);
+    this.disabledTooltip.setVisible(true);
+  }
+}
+
+hideDisabledTooltip() {
+  if (this.disabledTooltip) {
+    this.disabledTooltip.setVisible(false);
+  }
 }
 getActionTypeColor(actionType) {
   switch(actionType) {
@@ -1329,69 +1377,61 @@ findClosestAttackPosition(actor, target, attackRange) {
     }
   }
   
-  moveCharacter(participant, newX, newY) {
-    const oldX = participant.x;
-    const oldY = participant.y;
-    const distance = Math.abs(newX - oldX) + Math.abs(newY - oldY);
+moveCharacter(participant, newX, newY) {
+  const oldX = participant.x;
+  const oldY = participant.y;
+  const distance = Math.abs(newX - oldX) + Math.abs(newY - oldY);
+  
+  participant.moveTo(newX, newY);
+  participant.spendResource('speed', distance);
+  this.grid.moveUnit(participant.id, newX, newY);
+  
+  const sprites = this.participantSprites[participant.id];
+  if (sprites) {
+    const screenPos = this.grid.gridToScreen(newX, newY);
+    const newDepth = this.grid.calculateDepth(newX, newY, 'units');
     
-    // Update participant position
-    participant.moveTo(newX, newY);
-    participant.spendResource('speed', distance);
+    // Animate sprite, shadow, name, and health bar background
+    this.tweens.add({
+      targets: [sprites.sprite, sprites.shadow, sprites.nameText, sprites.healthBarBg],
+      x: screenPos.x,
+      y: (target) => {
+        if (target === sprites.shadow) return screenPos.y + 30;
+        if (target === sprites.nameText) return screenPos.y - 45;    // ✅ FIXED
+        if (target === sprites.healthBarBg) return screenPos.y + 40; // ✅ FIXED
+        return screenPos.y;
+      },
+      duration: 300,
+      ease: 'Power2',
+      onUpdate: () => {
+        sprites.sprite.setDepth(newDepth);
+        sprites.shadow.setDepth(newDepth - 0.5);
+        
+        // Update health bar position during movement
+        const healthPercent = participant.getHealthPercent() / 100;
+        const barWidth = Math.max(0, Math.min(60, 60 * healthPercent));
+        sprites.healthBar.x = sprites.healthBarBg.x - 30 + barWidth/2;
+        sprites.healthBar.y = sprites.healthBarBg.y; // ✅ This now works because healthBarBg.y is correct
+      },
+      onComplete: () => {
+        sprites.screenX = screenPos.x;
+        sprites.screenY = screenPos.y;
+        
+        // Recreate health bar at final position
+        this.updateHealthBars();
+      }
+    });
     
-    // Update grid
-    this.grid.moveUnit(participant.id, newX, newY);
-    
-    // Animate sprite movement
-    const sprites = this.participantSprites[participant.id];
-    if (sprites) {
-      const screenPos = this.grid.gridToScreen(newX, newY);
-      const newDepth = this.grid.calculateDepth(newX, newY, 'units');
-      
-      this.tweens.add({
-        targets: [sprites.sprite, sprites.shadow, sprites.nameText, sprites.healthBarBg, sprites.healthBar],
-        x: screenPos.x,
-        y: (target) => {
-          if (target === sprites.shadow) return screenPos.y + 30;
-          if (target === sprites.nameText) return screenPos.x;
-          if (target === sprites.healthBarBg || target === sprites.healthBar) return screenPos.x;
-          return screenPos.y;
-        },
-        duration: 300,
-        ease: 'Power2',
-        onUpdate: () => {
-          // Update depth during movement for proper layering
-          sprites.sprite.setDepth(newDepth);
-          sprites.shadow.setDepth(newDepth - 0.5);
-        },
-        onComplete: () => {
-          sprites.screenX = screenPos.x;
-          sprites.screenY = screenPos.y;
-        }
-      });
-      
-      // Separate tween for nameText and health bars Y position
-      this.tweens.add({
-        targets: sprites.nameText,
-        y: screenPos.y - 45,
-        duration: 300,
-        ease: 'Power2'
-      });
-      
-      this.tweens.add({
-        targets: [sprites.healthBarBg, sprites.healthBar],
-        y: screenPos.y + 40,
-        duration: 300,
-        ease: 'Power2'
-      });
-    }
-    
-    this.addLog(`${participant.character.name} moved to (${newX}, ${newY})`);
-    
-    // Clear movement mode if active
-    if (this.movementMode) {
-      this.toggleMoveMode();
-    }
+    // ✅ REMOVED: Separate tweens for nameText and healthBarBg
+    // They're now handled in the main tween above
   }
+  
+  this.addLog(`${participant.character.name} moved to (${newX}, ${newY})`);
+  
+  if (this.movementMode) {
+    this.toggleMoveMode();
+  }
+}
   
   onCharacterClick(participantId) {
   // If in movement mode, clicking character does nothing
@@ -1500,22 +1540,25 @@ findClosestAttackPosition(actor, target, attackRange) {
   }
   
   updateHealthBars() {
-    for (const pid in this.participantSprites) {
-      const data = this.participantSprites[pid];
-      const p = data.participant;
-      const healthPercent = p.getHealthPercent() / 100;
-      const color = healthPercent > 0.5 ? 0x4ade80 : healthPercent > 0.25 ? 0xfbbf24 : 0xef4444;
-      
-      data.healthBar.destroy();
-      data.healthBar = this.add.rectangle(
-        data.healthBarBg.x - 30,
-        data.healthBarBg.y,
-        60 * healthPercent,
-        6,
-        color
-      ).setOrigin(0, 0.5).setDepth(data.healthBarBg.depth);
-    }
+  for (const pid in this.participantSprites) {
+    const data = this.participantSprites[pid];
+    const p = data.participant;
+    const healthPercent = p.getHealthPercent() / 100;
+    const color = healthPercent > 0.5 ? 0x4ade80 : 
+                  healthPercent > 0.25 ? 0xfbbf24 : 0xef4444;
+    
+    // FIXED: Destroy and recreate with proper width clamping
+    data.healthBar.destroy();
+    const barWidth = Math.max(0, Math.min(60, 60 * healthPercent)); // Clamp between 0-60
+    data.healthBar = this.add.rectangle(
+      data.healthBarBg.x - 30,  // Start from left edge
+      data.healthBarBg.y,
+      barWidth,  // FIXED: Clamped width
+      6,
+      color
+    ).setOrigin(0, 0.5).setDepth(data.healthBarBg.depth);
   }
+}
   
   onCharacterHover(participantId) {
     const sprites = this.participantSprites[participantId];
@@ -1595,25 +1638,76 @@ findClosestAttackPosition(actor, target, attackRange) {
     this.startTurn();
   }
   
-  processAITurn(actor) {
-    this.addLog(`${actor.character.name} is thinking...`);
-    
-    const playerTargets = this.participants.filter(p => p.team === 'player' && p.status === 'active');
-    if (playerTargets.length === 0) {
-      this.handleEndTurn();
-      return;
+processAITurn(actor) {
+  this.addLog(`💭 ${actor.character.name} is thinking...`);
+  
+  const playerTargets = this.participants.filter(p => p.team === 'player' && p.status === 'active');
+  if (playerTargets.length === 0) {
+    this.handleEndTurn();
+    return;
+  }
+  
+  // FIXED: Get AI's actual abilities from their class
+  const aiAbilities = (actor.character.abilities || [])
+    .map(id => getAbility(id))
+    .filter(a => a && a.effectType === 'damage'); // Only use damage abilities for simple AI
+  
+  // Fallback to basic_strike if no abilities
+  if (aiAbilities.length === 0) {
+    aiAbilities.push(getAbility('basic_strike'));
+  }
+  
+  // Find closest player target
+  let closestTarget = playerTargets[0];
+  let closestDistance = calculateDistance(actor.x, actor.y, closestTarget.x, closestTarget.y);
+  
+  for (const target of playerTargets) {
+    const dist = calculateDistance(actor.x, actor.y, target.x, target.y);
+    if (dist < closestDistance) {
+      closestDistance = dist;
+      closestTarget = target;
     }
+  }
+  
+  // Try to find a usable ability
+  let selectedAbility = null;
+  for (const ability of aiAbilities) {
+    // Check if we can afford it
+    const validation = this.abilitySystem.validateAbilityUse(actor, ability);
+    if (!validation.valid) continue;
     
-    // Simple AI: attack closest
-    const target = playerTargets[0];
-    const ability = getAbility('basic_strike');
-    
-    if (ability) {
-      this.executeAbility(actor, ability, target);
+    // Check if target is in range
+    if (closestDistance <= ability.range) {
+      selectedAbility = ability;
+      break;
+    }
+  }
+  
+  // If we have a valid ability, use it
+  if (selectedAbility) {
+    setTimeout(() => {
+      this.executeAbility(actor, selectedAbility, closestTarget);
+      setTimeout(() => this.handleEndTurn(), 500);
+    }, 800);
+  } else {
+    // No ability in range - try to move closer
+    const moveDistance = Math.min(actor.remainingSpeed, closestDistance - 1);
+    if (moveDistance > 0) {
+      // Simple movement towards target
+      const dx = closestTarget.x - actor.x;
+      const dy = closestTarget.y - actor.y;
+      const moveX = actor.x + Math.sign(dx) * Math.min(Math.abs(dx), moveDistance);
+      const moveY = actor.y + Math.sign(dy) * Math.min(Math.abs(dy), moveDistance - Math.abs(moveX - actor.x));
+      
+      if (this.grid.isValidTile(moveX, moveY) && !this.grid.isOccupied(moveX, moveY)) {
+        this.moveCharacter(actor, moveX, moveY);
+      }
     }
     
     setTimeout(() => this.handleEndTurn(), 1000);
   }
+}
+
   
   endCombat() {
     this.combatActive = false;
@@ -1671,36 +1765,45 @@ findClosestAttackPosition(actor, target, attackRange) {
   }
   
   addLog(message) {
+  // Don't add empty messages
+  if (!message || message.trim() === '') {
+    return;
+  }
+  
   this.eventLog.push(message);
   
-  // Keep last 20 entries (increased from 6 for scrolling)
   const maxEntries = 20;
   if (this.eventLog.length > maxEntries) {
     this.eventLog.shift();
-    // Adjust scroll offset to maintain position
     if (this.logScrollOffset > 0) {
       this.logScrollOffset = Math.max(0, this.logScrollOffset - 1);
     }
   }
   
-  // Update log text
-  this.logText.setText(this.eventLog.join('\n'));
+  // ✅ FIXED: Filter out empty lines and join
+  const displayText = this.eventLog
+    .filter(line => line && line.trim() !== '')
+    .join('\n');
   
-  // Auto-scroll to bottom on new message (unless user has scrolled up)
-  const visibleLines = this.uiPanels.combatLog?.maxVisibleLines || 6;
-  const maxScroll = Math.max(0, this.eventLog.length - visibleLines);
+  this.logText.setText(displayText);
   
-  // If we were at the bottom, stay at the bottom
-  if (this.logScrollOffset >= maxScroll - 1) {
-    this.logScrollOffset = maxScroll;
-    this.logText.y = -this.logScrollOffset * this.logLineHeight;
-  }
+  // Calculate proper scroll to show newest at bottom
+  const visibleLines = this.uiPanels.combatLog?.maxVisibleLines || 20;
   
-  // Update scroll indicators
+  // ✅ FIXED: Count non-empty lines only
+  const nonEmptyLines = this.eventLog.filter(line => line && line.trim() !== '').length;
+  const maxScroll = Math.max(0, nonEmptyLines - visibleLines);
+  
+  // Auto-scroll to bottom (showing newest messages)
+  this.logScrollOffset = maxScroll;
+  this.logText.y = -this.logScrollOffset * this.logLineHeight;
+  console.log(this.logScrollOffset)
+  console.log(this.logScrollOffset)
+  
   this.updateScrollIndicators();
-  
   console.log(`[Combat Log] ${message}`);
 }
+
 
 
 }

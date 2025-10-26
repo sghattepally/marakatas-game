@@ -312,6 +312,12 @@ export const MISSIONS = {
         startX: 3,
         startY: 8,
         role: 'melee damage'
+      },
+      {
+        character: 'chennappa',
+        startX: 3,
+        startY: 6,
+        role: 'ranged damage'
       }
     ],
     
@@ -335,7 +341,7 @@ export const MISSIONS = {
       },
       {
         name: 'Merchant Guard B',
-        class: 'Yodha',
+        class: 'Dhanurdhara',
         level: 3,
         startX: 16,
         startY: 8,
@@ -351,7 +357,7 @@ export const MISSIONS = {
       },
       {
         name: 'Ship Captain',
-        class: 'Yodha',
+        class: 'Rishi',
         level: 4,
         startX: 17,
         startY: 7,

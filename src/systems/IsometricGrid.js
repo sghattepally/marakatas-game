@@ -94,8 +94,8 @@ export default class IsometricGrid {
     }
     
     // Isometric projection
-    const screenX = this.offsetX + (gridX - gridY) * (this.tileWidth / 2);
-    const screenY = this.offsetY + (gridX + gridY) * (this.tileHeight / 2);
+   const screenX = this.offsetX + (gridX + gridY) * (this.tileWidth / 2);
+  const screenY = this.offsetY + (gridY - gridX) * (this.tileHeight / 2);
     
     return { x: screenX, y: screenY };
   }
@@ -114,8 +114,9 @@ export default class IsometricGrid {
     const relX = screenX - this.offsetX;
     const relY = screenY - this.offsetY;
     
-    const gridX = Math.floor((relX / (this.tileWidth / 2) + relY / (this.tileHeight / 2)) / 2);
-    const gridY = Math.floor((relY / (this.tileHeight / 2) - relX / (this.tileWidth / 2)) / 2);
+    const gridX = Math.floor((relX / (this.tileWidth / 2) - relY / (this.tileHeight / 2)) / 2);
+  const gridY = Math.floor((relX / (this.tileWidth / 2) + relY / (this.tileHeight / 2)) / 2);
+  
     
     return { x: gridX, y: gridY };
   }

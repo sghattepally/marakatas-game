@@ -70,16 +70,16 @@ export default class MissionSceneIsometric extends Phaser.Scene {
   
   create() {
     const { width, height } = this.cameras.main;
-    
+
+
     // Create background (dark ocean/night)
     this.createBackground();
-    // Initialize isometric grid (20x10 for merchant ship)
     this.grid = new IsometricGrid(this, 20, 10, {
-      tileWidth: 64,
-      tileHeight: 32,
-      offsetX: width / 2 - 200,
-      offsetY: 150
-    });
+  tileWidth: 64,
+  tileHeight: 32,
+  offsetX: width / 2 - ((20 + 10) * 64 / 2) / 2,   // Center horizontally
+  offsetY: height / 2 + ((20 + 10) * 64 / 2) / 8   // Center vertically
+});
     
     this.grid.createGrid();
     
@@ -340,13 +340,18 @@ export default class MissionSceneIsometric extends Phaser.Scene {
     for (const participant of this.participants) {
       const screenPos = this.grid.gridToScreen(participant.x, participant.y);
       const depth = this.grid.calculateDepth(participant.x, participant.y, 'units');
-      
+          const rangeHighlight = this.add.circle(screenPos.x, screenPos.y, 24, 0xff0000, 0)
+  .setStrokeStyle(3, 0xfbbf24, 0.8);  // Gold highlight
+rangeHighlight.setDepth(depth - 0.3);
+rangeHighlight.setVisible(false);
+
+
       // Shadow (drawn first, under character)
       const shadow = this.add.ellipse(
         screenPos.x,
         screenPos.y + 30,
-        40,
-        15,
+        30,
+        12,
         0x000000,
         0.3
       );
@@ -354,7 +359,7 @@ export default class MissionSceneIsometric extends Phaser.Scene {
       
       // Character sprite (simple circle for now, replace with actual sprites)
       const color = participant.team === 'player' ? 0x4ade80 : 0xef4444;
-      const sprite = this.add.circle(screenPos.x, screenPos.y, 25, color)
+      const sprite = this.add.circle(screenPos.x, screenPos.y, 18, color)
         .setStrokeStyle(3, 0xffffff);
       sprite.setDepth(depth);
       sprite.setInteractive({ useHandCursor: true });
@@ -396,6 +401,7 @@ export default class MissionSceneIsometric extends Phaser.Scene {
         nameText,
         healthBar,
         healthBarBg,
+        rangeHighlight,
         screenX: screenPos.x,
         screenY: screenPos.y
       };
@@ -506,101 +512,143 @@ export default class MissionSceneIsometric extends Phaser.Scene {
     this.uiPanels.topBar = { topBar, roundText: this.roundText, currentTurnText: this.currentTurnText };
   }
   
-  createLeftPanel() {
-    const { height } = this.cameras.main;
-    const panelWidth = 280;
-    const panelX = panelWidth / 2;
-    
-    // Panel background
-    const panel = this.add.rectangle(panelX, height / 2, panelWidth, height, 0x1e293b, 0.95);
-    panel.setDepth(300);
-    
-    // Title
-    const titleText = this.add.text(panelX, 80, 'CURRENT ACTOR', {
-      fontSize: '16px',
-      color: '#fbbf24',
-      fontStyle: 'bold'
-    }).setOrigin(0.5).setDepth(301);
-    
-    // Actor name
-    const actorName = this.add.text(panelX, 120, '', {
-      fontSize: '20px',
-      color: '#ffffff',
-      fontStyle: 'bold'
-    }).setOrigin(0.5).setDepth(301);
-    
-    // Stats section
-    const statsY = 160;
-    const statLabels = this.add.text(30, statsY, 
-      'Bala:\nDakṣatā:\nDhṛti:\nBuddhi:\nPrajñā:\nSaṃkalpa:', {
-      fontSize: '13px',
-      color: '#94a3b8',
-      lineSpacing: 8
-    }).setDepth(301);
-    
-    const statValues = this.add.text(panelWidth - 30, statsY, '', {
-      fontSize: '13px',
-      color: '#e2e8f0',
-      fontStyle: 'bold',
-      lineSpacing: 8,
-      align: 'right'
-    }).setOrigin(1, 0).setDepth(301);
-    
-    // Resources section
-    const resourcesY = 300;
-    const resourceTitle = this.add.text(panelX, resourcesY, 'RESOURCES', {
-      fontSize: '14px',
-      color: '#fbbf24',
-      fontStyle: 'bold'
-    }).setOrigin(0.5).setDepth(301);
-    
-    const resourceLabels = this.add.text(30, resourcesY + 30,
-      'Prāṇa:\nTapas:\nMāyā:\nSpeed:', {
-      fontSize: '13px',
-      color: '#94a3b8',
-      lineSpacing: 8
-    }).setDepth(301);
-    
-    const resourceValues = this.add.text(panelWidth - 30, resourcesY + 30, '', {
-      fontSize: '13px',
-      color: '#e2e8f0',
-      fontStyle: 'bold',
-      lineSpacing: 8,
-      align: 'right'
-    }).setOrigin(1, 0).setDepth(301);
-    
-    // Action economy section
-    const actionsY = 450;
-    const actionsTitle = this.add.text(panelX, actionsY, 'ACTIONS', {
-      fontSize: '14px',
-      color: '#fbbf24',
-      fontStyle: 'bold'
-    }).setOrigin(0.5).setDepth(301);
-    
-    const actionLabels = this.add.text(30, actionsY + 30,
-      'Actions:\nBonus:\nReactions:', {
-      fontSize: '13px',
-      color: '#94a3b8',
-      lineSpacing: 8
-    }).setDepth(301);
-    
-    const actionValues = this.add.text(panelWidth - 30, actionsY + 30, '', {
-      fontSize: '13px',
-      color: '#e2e8f0',
-      fontStyle: 'bold',
-      lineSpacing: 8,
-      align: 'right'
-    }).setOrigin(1, 0).setDepth(301);
-    
-    this.uiPanels.leftPanel = {
-      panel,
-      titleText,
-      actorName,
-      statValues,
-      resourceValues,
-      actionValues
-    };
-  }
+ createLeftPanel() {
+  const { height } = this.cameras.main;
+  const panelWidth = 280;
+  const panelX = panelWidth / 2;
+  
+  // Panel background
+  const panel = this.add.rectangle(panelX, height / 2, panelWidth, height, 0x1e293b, 0.95);
+  panel.setDepth(300);
+  
+  // Title
+  const titleText = this.add.text(panelX, 80, 'CURRENT ACTOR', {
+    fontSize: '16px',
+    color: '#fbbf24',
+    fontStyle: 'bold'
+  }).setOrigin(0.5).setDepth(301);
+  
+  // Actor name
+  const actorName = this.add.text(panelX, 120, '', {
+    fontSize: '20px',
+    color: '#ffffff',
+    fontStyle: 'bold'
+  }).setOrigin(0.5).setDepth(301);
+  
+  // Stats section
+  const statsY = 160;
+  const statLabels = this.add.text(30, statsY, 
+    'Bala:\nDakṣatā:\nDhṛti:\nBuddhi:\nPrajñā:\nSaṃkalpa:', {
+    fontSize: '13px',
+    color: '#94a3b8',
+    lineSpacing: 8
+  }).setDepth(301);
+  
+  const statValues = this.add.text(panelWidth - 30, statsY, '', {
+    fontSize: '13px',
+    color: '#e2e8f0',
+    fontStyle: 'bold',
+    lineSpacing: 8,
+    align: 'right'
+  }).setOrigin(1, 0).setDepth(301);
+  
+  // Resources section
+  const resourcesY = 300;
+  const resourceTitle = this.add.text(panelX, resourcesY, 'RESOURCES', {
+    fontSize: '14px',
+    color: '#fbbf24',
+    fontStyle: 'bold'
+  }).setOrigin(0.5).setDepth(301);
+  
+  const resourceLabels = this.add.text(30, resourcesY + 30,
+    'Prāṇa:\nTapas:\nMāyā:\nSpeed:', {
+    fontSize: '13px',
+    color: '#94a3b8',
+    lineSpacing: 8
+  }).setDepth(301);
+  
+  const resourceValues = this.add.text(panelWidth - 30, resourcesY + 30, '', {
+    fontSize: '13px',
+    color: '#e2e8f0',
+    fontStyle: 'bold',
+    lineSpacing: 8,
+    align: 'right'
+  }).setOrigin(1, 0).setDepth(301);
+  
+  // Action economy section
+  const actionsY = 450;
+  const actionsTitle = this.add.text(panelX, actionsY, 'ACTIONS', {
+    fontSize: '14px',
+    color: '#fbbf24',
+    fontStyle: 'bold'
+  }).setOrigin(0.5).setDepth(301);
+  
+  const actionLabels = this.add.text(30, actionsY + 30,
+    'Actions:\nBonus:\nReactions:', {
+    fontSize: '13px',
+    color: '#94a3b8',
+    lineSpacing: 8
+  }).setDepth(301);
+  
+  const actionValues = this.add.text(panelWidth - 30, actionsY + 30, '', {
+    fontSize: '13px',
+    color: '#e2e8f0',
+    fontStyle: 'bold',
+    lineSpacing: 8,
+    align: 'right'
+  }).setOrigin(1, 0).setDepth(301);
+  
+  // ✅ NEW: Collapse/Expand tab (stays visible when collapsed)
+  const tabWidth = 30;
+  const tabHeight = 80;
+  const collapseTab = this.add.rectangle(
+    panelWidth + tabWidth/2,   // Right edge of panel
+    height / 2, 
+    tabWidth, 
+    tabHeight, 
+    0x334155
+  ).setInteractive({ useHandCursor: true }).setDepth(301);
+  
+  const collapseIcon = this.add.text(
+    panelWidth + tabWidth/2, 
+    height / 2, 
+    '‹', {  // Left arrow when expanded
+    fontSize: '24px',
+    color: '#94a3b8',
+    fontStyle: 'bold'
+  }).setOrigin(0.5).setDepth(302);
+  
+  collapseTab.on('pointerdown', () => this.toggleLeftPanel());
+  collapseTab.on('pointerover', () => {
+    collapseTab.setFillStyle(0x475569);
+    collapseIcon.setColor('#ffffff');
+  });
+  collapseTab.on('pointerout', () => {
+    collapseTab.setFillStyle(0x334155);
+    collapseIcon.setColor('#94a3b8');
+  });
+  
+  this.uiPanels.leftPanel = {
+    panel,
+    titleText,
+    actorName,
+    statLabels,
+    statValues,
+    resourceTitle,
+    resourceLabels,
+    resourceValues,
+    actionsTitle,
+    actionLabels,
+    actionValues,
+    collapseTab,
+    collapseIcon,
+    visible: true,
+    collapsedX: -panelWidth / 2,          // Hide off left edge
+    expandedX: panelX,                     // Normal position
+    tabCollapsedX: tabWidth / 2,           // Tab at left edge when collapsed
+    tabExpandedX: panelWidth + tabWidth/2  // Tab at right of panel when expanded
+  };
+}
   
   createRightPanel() {
     const { width, height } = this.cameras.main;
@@ -721,37 +769,34 @@ createCombatLogPanel() {
     fontStyle: 'bold'
   }).setOrigin(0.5).setDepth(301);
   
-  // Create mask for scrollable area
+  // --- FIX: Define the visible area's properties ---
+  const logAreaX = panelX - panelWidth/2 + 10;
+  const logAreaY = panelY - panelHeight/2 + 35;
+  const logAreaWidth = panelWidth - 20;
+  const logAreaHeight = panelHeight - 45;
+
   const maskShape = this.make.graphics();
   maskShape.fillStyle(0xffffff);
-  maskShape.fillRect(
-    panelX - panelWidth/2 + 10,
-    panelY - panelHeight/2 + 35,
-    panelWidth - 20,
-    panelHeight - 45
-  );
+  maskShape.fillRect(logAreaX, logAreaY, logAreaWidth, logAreaHeight);
   const mask = maskShape.createGeometryMask();
   
-  // FIXED: Container positioned at TOP of visible area
-  this.logTextContainer = this.add.container(
-    panelX - panelWidth/2 + 15,
-    panelY + panelHeight/2 - 10  // ← FIXED: Start from bottom, text grows upward
-  );
+  // --- FIX: Position the container at the TOP of the masked area ---
+  this.logTextContainer = this.add.container(logAreaX + 5, logAreaY);
   this.logTextContainer.setDepth(301);
   this.logTextContainer.setMask(mask);
   
-  // Text anchored to BOTTOM so new lines appear at bottom
   this.logText = this.add.text(0, 0, '', {
     fontSize: '12px',
     color: '#e2e8f0',
     lineSpacing: 6,
-    wordWrap: { width: panelWidth - 30 },
+    wordWrap: { width: logAreaWidth - 10 },
     fontStyle: 'normal'
-  }).setOrigin(0, 1); // ← FIXED: Origin at bottom-left (0, 1)
+  })
+  // --- FIX: Set origin to top-left so text renders downwards ---
+  .setOrigin(0, 0); 
   
   this.logTextContainer.add(this.logText);
-  
-  // Scroll indicators
+  this.logLineHeight = 18;
   this.logScrollUpIndicator = this.add.text(panelX + panelWidth/2 - 25, panelY - panelHeight/2 + 40, '▲', {
     fontSize: '12px',
     color: '#64748b'
@@ -761,12 +806,7 @@ createCombatLogPanel() {
     fontSize: '12px',
     color: '#64748b'
   }).setDepth(302).setVisible(true);
-  
-  // Scroll state
-  this.logScrollOffset = 0;
-  this.logLineHeight = 18;
-  
-  // Mouse wheel scrolling
+
   this.input.on('wheel', (pointer, gameObjects, deltaX, deltaY, deltaZ) => {
     if (pointer.x >= panelX - panelWidth/2 && pointer.x <= panelX + panelWidth/2 &&
         pointer.y >= panelY - panelHeight/2 && pointer.y <= panelY + panelHeight/2) {
@@ -777,17 +817,137 @@ createCombatLogPanel() {
   this.input.keyboard.on('keydown-UP', () => this.scrollCombatLog(-1));
   this.input.keyboard.on('keydown-DOWN', () => this.scrollCombatLog(1));
   
+  const tabWidth = 80;
+  const tabHeight = 30;
+  const collapseTab = this.add.rectangle(
+    panelX,
+    panelY + panelHeight/2 + tabHeight/2,
+    tabWidth, 
+    tabHeight, 
+    0x334155
+  ).setInteractive({ useHandCursor: true }).setDepth(301);
+  
+  const collapseIcon = this.add.text(panelX, panelY + panelHeight/2 + tabHeight/2, '▲', {
+    fontSize: '20px',
+    color: '#94a3b8',
+    fontStyle: 'bold'
+  }).setOrigin(0.5).setDepth(302);
+  
+  collapseTab.on('pointerdown', () => this.toggleCombatLogPanel());
+  collapseTab.on('pointerover', () => { collapseTab.setFillStyle(0x475569); collapseIcon.setColor('#ffffff'); });
+  collapseTab.on('pointerout', () => { collapseTab.setFillStyle(0x334155); collapseIcon.setColor('#94a3b8'); });
+  
   this.uiPanels.combatLog = {
     bg: logBg,
     title: logTitle,
     text: this.logText,
     container: this.logTextContainer,
     mask: mask,
-    maxVisibleLines: 6,
+    // --- Store the visible area height for calculations ---
+    visibleHeight: logAreaHeight,
     scrollUpIndicator: this.logScrollUpIndicator,
-    scrollDownIndicator: this.logScrollDownIndicator
+    scrollDownIndicator: this.logScrollDownIndicator,
+    collapseTab,
+    collapseIcon,
+    visible: true,
+    collapsedY: -panelHeight / 2,
+    expandedY: panelY,
+    tabCollapsedY: tabHeight / 2 + 35,
+    tabExpandedY: panelY + panelHeight/2 + tabHeight/2
   };
 }
+
+toggleLeftPanel() {
+  const panel = this.uiPanels.leftPanel;
+  panel.visible = !panel.visible;
+  
+  const targetX = panel.visible ? panel.expandedX : panel.collapsedX;
+  const tabTargetX = panel.visible ? panel.tabExpandedX : panel.tabCollapsedX;
+  
+  // Collect all panel elements
+  const panelElements = [
+    panel.panel,
+    panel.titleText,
+    panel.actorName,
+    panel.statLabels,
+    panel.statValues,
+    panel.resourceTitle,
+    panel.resourceLabels,
+    panel.resourceValues,
+    panel.actionsTitle,
+    panel.actionLabels,
+    panel.actionValues
+  ];
+  
+  // Animate panel sliding
+  this.tweens.add({
+    targets: panelElements,
+    x: (target) => {
+      // Calculate relative movement for each element
+      const currentX = target.x;
+      const deltaX = targetX - panel.panel.x;
+      return currentX + deltaX;
+    },
+    duration: 300,
+    ease: 'Power2'
+  });
+  
+  // Animate tab separately
+  this.tweens.add({
+    targets: [panel.collapseTab, panel.collapseIcon],
+    x: tabTargetX,
+    duration: 300,
+    ease: 'Power2'
+  });
+  
+  // Update icon
+  panel.collapseIcon.setText(panel.visible ? '‹' : '›');
+}
+toggleCombatLogPanel() {
+  const panel = this.uiPanels.combatLog;
+  panel.visible = !panel.visible;
+  
+  const targetY = panel.visible ? panel.expandedY : panel.collapsedY;
+  const tabTargetY = panel.visible ? panel.tabExpandedY : panel.tabCollapsedY;
+  
+  // Collect all panel elements
+  const panelElements = [
+    panel.bg,
+    panel.title,
+    panel.container,
+    panel.scrollUpIndicator,
+    panel.scrollDownIndicator
+  ];
+  
+  // Animate panel sliding
+  this.tweens.add({
+    targets: panelElements,
+    y: (target) => {
+      // Calculate relative movement for each element
+      const currentY = target.y;
+      const deltaY = targetY - panel.bg.y;
+      return currentY + deltaY;
+    },
+    duration: 300,
+    ease: 'Power2',
+    onUpdate: () => {
+      // Update mask position during animation
+      // The mask needs to follow the panel
+    }
+  });
+  
+  // Animate tab separately
+  this.tweens.add({
+    targets: [panel.collapseTab, panel.collapseIcon],
+    y: tabTargetY,
+    duration: 300,
+    ease: 'Power2'
+  });
+  
+  // Update icon
+  panel.collapseIcon.setText(panel.visible ? '▲' : '▼');
+}
+
 
 
   createViewToggle() {
@@ -831,62 +991,47 @@ createCombatLogPanel() {
     this.uiPanels.viewToggle = { toggleBtn, toggleText };
   }
 
-  scrollCombatLog(direction) {
-  const maxLines = this.eventLog.length;
-  const visibleLines = this.uiPanels.combatLog.maxVisibleLines;
-  
-  // Can't scroll if everything fits
-  if (maxLines <= visibleLines) {
-    this.logScrollOffset = 0;
-    this.updateScrollIndicators();
+scrollCombatLog(direction) {
+  const totalTextHeight = this.logText.height;
+  const visibleHeight = this.uiPanels.combatLog.visibleHeight;
+
+  // Cannot scroll if all text fits
+  if (totalTextHeight <= visibleHeight) {
     return;
   }
   
-  // Update scroll offset
-  this.logScrollOffset += direction;
+  // The y position is clamped between 0 (top) and a negative value (bottom)
+  const scrollAmount = this.logLineHeight; // Scroll one line at a time
+  const newY = this.logText.y - (direction * scrollAmount);
   
-  // Clamp to valid range
-  const maxScroll = Math.max(0, maxLines - visibleLines);
-  this.logScrollOffset = Phaser.Math.Clamp(this.logScrollOffset, 0, maxScroll);
-  
-  // Update text position
-  this.logText.y = -this.logScrollOffset * this.logLineHeight;
-  
-  // Update scroll indicators
+  const topClamp = 0;
+  const bottomClamp = visibleHeight - totalTextHeight;
+
+  this.logText.y = Phaser.Math.Clamp(newY, bottomClamp, topClamp);
+
   this.updateScrollIndicators();
 }
 
 updateScrollIndicators() {
-  const maxLines = this.eventLog.length;
-  const visibleLines = this.uiPanels.combatLog.maxVisibleLines;
-  const maxScroll = Math.max(0, maxLines - visibleLines);
-  
-  // Show up arrow if we can scroll up
-  this.logScrollUpIndicator.setVisible(this.logScrollOffset > 0);
-  
-  // Show down arrow if we can scroll down
-  this.logScrollDownIndicator.setVisible(this.logScrollOffset < maxScroll);
-  
-  // Pulse effect on indicators
-  if (this.logScrollUpIndicator.visible) {
-    this.tweens.add({
-      targets: this.logScrollUpIndicator,
-      alpha: 0.3,
-      duration: 500,
-      yoyo: true,
-      repeat: -1
-    });
+  if (!this.logText || !this.logText.scene) return;
+
+  const totalTextHeight = this.logText.height;
+  const visibleHeight = this.uiPanels.combatLog.visibleHeight;
+
+  // Hide both indicators if all the text is visible
+  if (totalTextHeight <= visibleHeight) {
+    this.logScrollUpIndicator.setVisible(false);
+    this.logScrollDownIndicator.setVisible(false);
+    return;
   }
-  
-  if (this.logScrollDownIndicator.visible) {
-    this.tweens.add({
-      targets: this.logScrollDownIndicator,
-      alpha: 0.3,
-      duration: 500,
-      yoyo: true,
-      repeat: -1
-    });
-  }
+
+  // Show the "up" arrow if the text is scrolled down at all
+  const atTop = Phaser.Math.Within(this.logText.y, 0, 0.5);
+  this.logScrollUpIndicator.setVisible(!atTop);
+
+  // Show the "down" arrow if the text is not at the very bottom
+  const atBottom = Phaser.Math.Within(this.logText.y, visibleHeight - totalTextHeight, 0.5);
+  this.logScrollDownIndicator.setVisible(!atBottom);
 }
   
   toggleRightPanel() {
@@ -956,6 +1101,8 @@ updateAllSpritePositions() {
       6,
       color
     ).setOrigin(0, 0.5).setDepth(depth + 0.1);
+    data.rangeHighlight.setPosition(screenPos.x, screenPos.y).setDepth(depth - 0.3);
+
     
     data.screenX = screenPos.x;
     data.screenY = screenPos.y;
@@ -1268,10 +1415,70 @@ getResourceCostLabel(resourceType, cost) {
   const actor = this.gameSession.getCurrentActor();
   this.addLog(`Select target for ${ability.name}...`);
   
-  // ✅ UPDATED: Show range including potential movement
+  // Show range including potential movement
   const maxRange = ability.range + actor.remainingSpeed;
   const validMoves = this.grid.calculateMovementRange(actor.x, actor.y, maxRange, true);
   this.grid.highlightTiles(validMoves, 0x3b82f6, 0.3);
+  
+  // ✅ NEW: Highlight enemies in range
+  this.highlightEnemiesInRange(actor, ability);
+}
+
+
+
+highlightEnemiesInRange(actor, ability) {
+  // Clear all previous highlights
+  this.clearEnemyHighlights();
+  
+  if (!actor || !ability) return;
+  
+  // Find all enemy targets
+  const enemies = this.participants.filter(p => 
+    p.team !== actor.team && 
+    p.status === 'active'
+  );
+  
+  // Check each enemy
+  for (const enemy of enemies) {
+    const distance = calculateDistance(actor.x, actor.y, enemy.x, enemy.y);
+    const sprites = this.participantSprites[enemy.id];
+    
+    if (!sprites || !sprites.rangeHighlight) continue;
+    
+    // Highlight if in range (including potential movement)
+    const maxRange = ability.range + actor.remainingSpeed;
+    
+    if (distance <= maxRange) {
+      sprites.rangeHighlight.setVisible(true);
+      
+      // Pulse animation for highlighted enemies
+      this.tweens.add({
+        targets: sprites.rangeHighlight,
+        alpha: { from: 0.8, to: 0.3 },
+        scale: { from: 1, to: 1.1 },
+        duration: 800,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut'
+      });
+    }
+  }
+}
+
+clearEnemyHighlights() {
+  for (const participantId in this.participantSprites) {
+    const sprites = this.participantSprites[participantId];
+    if (sprites.rangeHighlight) {
+      sprites.rangeHighlight.setVisible(false);
+      
+      // Stop any ongoing animations
+      this.tweens.killTweensOf(sprites.rangeHighlight);
+      
+      // Reset scale and alpha
+      sprites.rangeHighlight.setAlpha(0.8);
+      sprites.rangeHighlight.setScale(1);
+    }
+  }
 }
 
   
@@ -1345,6 +1552,7 @@ findClosestAttackPosition(actor, target, attackRange) {
 }
 
   toggleMoveMode() {
+    this.clearEnemyHighlights();
     this.movementMode = !this.movementMode;
     
     const { moveModeBtn, moveModeText } = this.uiPanels.actionBar;
@@ -1391,39 +1599,43 @@ moveCharacter(participant, newX, newY) {
     const screenPos = this.grid.gridToScreen(newX, newY);
     const newDepth = this.grid.calculateDepth(newX, newY, 'units');
     
-    // Animate sprite, shadow, name, and health bar background
+    // Animate ALL elements together in ONE tween
     this.tweens.add({
-      targets: [sprites.sprite, sprites.shadow, sprites.nameText, sprites.healthBarBg],
-      x: screenPos.x,
+targets: [sprites.sprite, sprites.shadow, sprites.nameText, sprites.healthBarBg, sprites.healthBar, sprites.rangeHighlight],
+
+      x: (target) => {
+        if (target === sprites.healthBar) {
+          // Health bar needs special X calculation (left edge of bar)
+          return screenPos.x - 30;
+        }
+        return screenPos.x;
+      },
       y: (target) => {
         if (target === sprites.shadow) return screenPos.y + 30;
-        if (target === sprites.nameText) return screenPos.y - 45;    // ✅ FIXED
-        if (target === sprites.healthBarBg) return screenPos.y + 40; // ✅ FIXED
+        if (target === sprites.nameText) return screenPos.y - 45;
+        if (target === sprites.healthBarBg) return screenPos.y + 40;
+        if (target === sprites.healthBar) return screenPos.y + 40;
+        if (target === sprites.rangeHighlight) return screenPos.y;
         return screenPos.y;
       },
       duration: 300,
       ease: 'Power2',
       onUpdate: () => {
+        // Update depths during movement
         sprites.sprite.setDepth(newDepth);
         sprites.shadow.setDepth(newDepth - 0.5);
-        
-        // Update health bar position during movement
-        const healthPercent = participant.getHealthPercent() / 100;
-        const barWidth = Math.max(0, Math.min(60, 60 * healthPercent));
-        sprites.healthBar.x = sprites.healthBarBg.x - 30 + barWidth/2;
-        sprites.healthBar.y = sprites.healthBarBg.y; // ✅ This now works because healthBarBg.y is correct
+        sprites.nameText.setDepth(newDepth + 0.1);
+        sprites.healthBarBg.setDepth(newDepth + 0.1);
+        sprites.healthBar.setDepth(newDepth + 0.1);
       },
       onComplete: () => {
         sprites.screenX = screenPos.x;
         sprites.screenY = screenPos.y;
         
-        // Recreate health bar at final position
+        // Recreate health bar at final position to ensure correct rendering
         this.updateHealthBars();
       }
     });
-    
-    // ✅ REMOVED: Separate tweens for nameText and healthBarBg
-    // They're now handled in the main tween above
   }
   
   this.addLog(`${participant.character.name} moved to (${newX}, ${newY})`);
@@ -1632,6 +1844,7 @@ moveCharacter(participant, newX, newY) {
   }
   
   handleEndTurn() {
+    this.clearEnemyHighlights();
     this.grid.clearHighlights();
     this.targetingMode = false;
     this.gameSession.nextTurn();
@@ -1765,42 +1978,35 @@ processAITurn(actor) {
   }
   
   addLog(message) {
-  // Don't add empty messages
   if (!message || message.trim() === '') {
     return;
   }
-  
+
   this.eventLog.push(message);
-  
-  const maxEntries = 20;
-  if (this.eventLog.length > maxEntries) {
+
+  const maxLogHistory = 50; // Keep a larger history in memory
+  if (this.eventLog.length > maxLogHistory) {
     this.eventLog.shift();
-    if (this.logScrollOffset > 0) {
-      this.logScrollOffset = Math.max(0, this.logScrollOffset - 1);
-    }
   }
-  
-  // ✅ FIXED: Filter out empty lines and join
-  const displayText = this.eventLog
-    .filter(line => line && line.trim() !== '')
-    .join('\n');
-  
+
+  const displayText = this.eventLog.join('\n');
   this.logText.setText(displayText);
-  
-  // Calculate proper scroll to show newest at bottom
-  const visibleLines = this.uiPanels.combatLog?.maxVisibleLines || 20;
-  
-  // ✅ FIXED: Count non-empty lines only
-  const nonEmptyLines = this.eventLog.filter(line => line && line.trim() !== '').length;
-  const maxScroll = Math.max(0, nonEmptyLines - visibleLines);
-  
-  // Auto-scroll to bottom (showing newest messages)
-  this.logScrollOffset = maxScroll;
-  this.logText.y = -this.logScrollOffset * this.logLineHeight;
-  console.log(this.logScrollOffset)
-  console.log(this.logScrollOffset)
-  
-  this.updateScrollIndicators();
+
+  // --- FIX: Use text height to calculate position ---
+  // This ensures the bottom of the text is visible.
+  this.time.delayedCall(0, () => {
+    if (!this.logText || !this.logText.scene) return;
+
+    const totalTextHeight = this.logText.height;
+    const visibleHeight = this.uiPanels.combatLog.visibleHeight;
+
+    // Position the text so the last line is at the bottom of the view
+    // The y position will be 0 or a negative number.
+    this.logText.y = Math.min(0, visibleHeight - totalTextHeight);
+
+    this.updateScrollIndicators();
+  });
+
   console.log(`[Combat Log] ${message}`);
 }
 

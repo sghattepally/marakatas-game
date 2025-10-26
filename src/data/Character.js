@@ -592,5 +592,16 @@ export const MARAKATAS_ROSTER = {
     buddhi: 8,
     prajna: 9,
     samkalpa: 11
+  }),
+  chennappa: () => new CharacterStats('Chennappa', {
+    race: 'Human',
+    class: 'Rishi',
+    level: 4,
+    bala: 14,
+    dakshata: 10,
+    dhriti: 12,
+    buddhi: 8,
+    prajna: 9,
+    samkalpa: 11
   })
 };

@@ -208,16 +208,6 @@ export class AbilitySystem {
         };
       }
       
-      // Check range
-      const distance = calculateDistance(actor.x, actor.y, target.x, target.y);
-      if (distance > ability.range) {
-        return {
-          valid: false,
-          message: `Target out of range (max ${ability.range} squares).`,
-          target: null,
-          position: null
-        };
-      }
       
       // Check team alignment
       if (ability.targetType === 'enemy' && actor.team === target.team) {
@@ -233,6 +223,22 @@ export class AbilitySystem {
         return {
           valid: false,
           message: 'Can only target allies with this ability.',
+          target: null,
+          position: null
+        };
+      }
+
+       if (ability.range === 'speed') {
+  effectiveRange = actor.remainingSpeed;  // ← Use a local variable instead
+} else {
+  effectiveRange = ability.range;
+}
+
+  const distance = calculateDistance(actor.x, actor.y, target.x, target.y);
+      if (distance > ability.range) {
+        return {
+          valid: false,
+          message: `Target out of range (max ${ability.range} squares).`,
           target: null,
           position: null
         };

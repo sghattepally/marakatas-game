@@ -198,8 +198,8 @@ export default class MissionScene extends Phaser.Scene {
     const spacing = 80; // Pixel distance per grid square
     
     for (const participant of this.participants) {
-      const screenX = 400 + participant.x * spacing;
-      const screenY = 300 + participant.y * spacing;
+      const screenX = 50 + participant.x * spacing;
+    const screenY = 50 + participant.y * spacing;
       console.log(`Character: ${participant.character.name}`);
   console.log(`Position: x=${participant.x}, y=${participant.y}`);
   console.log(`Screen pos: ${screenX}, ${screenY}`);
@@ -562,6 +562,14 @@ export default class MissionScene extends Phaser.Scene {
    */
   showRangeVisualization(actor, ability) {
   const { screenX, screenY } = this.participantSprites[actor.id];
+  let effectiveRange = ability.range;
+  if (ability.range === 'speed') {
+    effectiveRange = actor.remainingSpeed;
+  }
+  console.log(`Actor position: ${actor.character.name} at ${screenX}, ${screenY}`);
+  console.log(`Ability range: ${effectiveRange} pixels: ${effectiveRange * 80}`);
+  
+  
   
   this.clearRangeVisualization();
   
@@ -569,7 +577,7 @@ export default class MissionScene extends Phaser.Scene {
   this.rangeVisualization.outline = this.createDashedCircle(
     screenX,
     screenY,
-    ability.range * 80,
+    effectiveRange * 80,  // ← Use effectiveRange, not ability.range
     0x4ade80
   );
   
@@ -583,40 +591,29 @@ export default class MissionScene extends Phaser.Scene {
    * Create dashed circle outline
    */
   createDashedCircle(centerX, centerY, radius, color) {
-    const graphics = this.make.graphics({ x: 0, y: 0, add: false });
-    graphics.lineStyle(2, color, 0.7);
-    
-    const dashLength = 8;
-    const gapLength = 8;
-    const circumference = 2 * Math.PI * radius;
-    const dashCount = Math.floor(circumference / (dashLength + gapLength));
-    
-    graphics.beginPath();
-    
-    for (let i = 0; i < dashCount; i++) {
-      const startAngle = (i * (dashLength + gapLength) / circumference) * Math.PI * 2;
-      const endAngle = ((i * (dashLength + gapLength) + dashLength) / circumference) * Math.PI * 2;
-      
-      const x1 = centerX + Math.cos(startAngle) * radius;
-      const y1 = centerY + Math.sin(startAngle) * radius;
-      const x2 = centerX + Math.cos(endAngle) * radius;
-      const y2 = centerY + Math.sin(endAngle) * radius;
-      
-      graphics.moveTo(x1, y1);
-      graphics.lineTo(x2, y2);
-    }
-    
-    graphics.closePath();
-    graphics.strokePath();
-    
-    graphics.generateTexture('dashedCircle', radius * 2 + 10, radius * 2 + 10);
-    graphics.destroy();
-    
-    const circle = this.add.image(centerX, centerY, 'dashedCircle');
-    circle.setDepth(40);
-    
-    return circle;
+  if (!radius || radius <= 0 || isNaN(radius)) {
+    console.warn('Invalid radius:', radius);
+    return null;
   }
+  
+    // Draw a solid circle outline using graphics
+  const graphics = this.make.graphics({ x: 0, y: 0, add: false });
+  graphics.lineStyle(2, color, 0.5);  // 0.5 = 50% transparency
+  graphics.strokeCircle(centerX, centerY, radius);
+  
+  // Generate texture from graphics
+  const textureKey = `circle_${Math.random()}`;
+  graphics.generateTexture(textureKey, radius * 2 + 20, radius * 2 + 20);
+  graphics.destroy();
+  
+  // Add circle to scene
+  const circle = this.add.image(centerX, centerY, textureKey);
+  circle.setDepth(40);
+  circle.setOrigin(0.5, 0.5);
+  circle.setAlpha(0.5);  // Semi-transparent
+  
+  return circle;
+}
 
   /**
    * Update which targets are valid/invalid for current ability
@@ -853,6 +850,12 @@ export default class MissionScene extends Phaser.Scene {
   // ==========================================
 
   selectAbility(ability) {
+  
+    console.log('Selected ability:', ability);
+  console.log('Ability ID:', ability.id);
+  console.log('Ability range:', ability.range);
+  console.log('Target type:', ability.targetType);
+  
     this.selectedAbility = ability;
     this.targetingAbility = ability;
     this.targetingMode = true;

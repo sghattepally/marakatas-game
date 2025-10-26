@@ -17,8 +17,18 @@ import { AbilitySystem, calculateDistance } from '../systems/AbilitySystem.js';
 import { CharacterStats, SessionCharacter, GameSession, MARAKATAS_ROSTER } from '../data/Character.js';
 import { ABILITY_DATABASE, CLASS_ABILITIES, MISSIONS, getAbility } from '../data/Abilities.js';
 
+const UI_COLORS = {
+  action: 0x4ade80,      // Green
+  bonusAction: 0xef4444, // Red
+  reaction: 0xa855f7,    // Purple
+  free: 0x94a3b8,        // Gray
+  tapas: 0xf97316,       // Orange
+  maya: 0x3b82f6,        // Blue
+  speed: 0xfbbf24        // Yellow
+};
+
 export default class MissionSceneIsometric extends Phaser.Scene {
-  constructor() {
+    constructor() {
     super({ key: 'MissionSceneIsometric' });
     
     // Combat state
@@ -407,6 +417,9 @@ export default class MissionSceneIsometric extends Phaser.Scene {
     // ===== TOP BAR (Always visible) =====
     this.createTopBar();
     
+    // ===== COMBAT LOG PANEL (NEW - ADD THIS) =====
+    this.createCombatLogPanel();  // ← ADD THIS LINE
+    
     // ===== RIGHT PANEL (Collapsible) =====
     this.createRightPanel();
     
@@ -653,58 +666,135 @@ export default class MissionSceneIsometric extends Phaser.Scene {
   }
   
   createActionBar() {
-    const { width, height } = this.cameras.main;
-    
-    // Bottom bar (like Transistor's ability bar) - make it taller
-    const barHeight = 140;
-    const bar = this.add.rectangle(width / 2, height - barHeight / 2, width, barHeight, 0x0f172a, 0.9);
-    bar.setDepth(300);
-    
-    // Combat log area (left side) - larger and higher up
-    const logBg = this.add.rectangle(250, height - barHeight + 50, 480, 90, 0x1e293b, 0.5);
-    logBg.setDepth(300);
-    
-    this.logText = this.add.text(20, height - barHeight + 15, '', {
-      fontSize: '13px',
-      color: '#e2e8f0',
-      lineSpacing: 6,
-      wordWrap: { width: 450 },
-      fontStyle: 'bold'
-    }).setDepth(301);
-    
-    // Move mode toggle button (center)
-    const moveModeBtn = this.add.rectangle(600, height - barHeight / 2, 150, 40, 0x334155)
-      .setInteractive({ useHandCursor: true })
-      .setDepth(301);
-    
-    const moveModeText = this.add.text(600, height - barHeight / 2, '🚶 MOVE MODE', {
-      fontSize: '14px',
-      color: '#94a3b8',
-      fontStyle: 'bold'
-    }).setOrigin(0.5).setDepth(302);
-    
-    moveModeBtn.on('pointerdown', () => this.toggleMoveMode());
-    moveModeBtn.on('pointerover', () => moveModeBtn.setFillStyle(0x475569));
-    moveModeBtn.on('pointerout', () => {
-      moveModeBtn.setFillStyle(this.movementMode ? 0x3b82f6 : 0x334155);
-    });
-    
-    // Camera controls hint (right side)
-    this.add.text(width - 20, height - 30, 'Camera: WASD or Middle Mouse', {
-      fontSize: '11px',
-      color: '#64748b',
-      fontStyle: 'italic'
-    }).setOrigin(1, 0).setDepth(301);
-    
-    this.uiPanels.actionBar = { 
-      bar, 
-      logBg,
-      logText: this.logText,
-      moveModeBtn,
-      moveModeText
-    };
-  }
+  const { width, height } = this.cameras.main;
   
+  // Bottom bar (simplified - no log here)
+  const barHeight = 80;
+  const bar = this.add.rectangle(width / 2, height - barHeight / 2, width, barHeight, 0x0f172a, 0.9);
+  bar.setDepth(300);
+  
+  // Move mode toggle button (center)
+  const moveModeBtn = this.add.rectangle(width / 2, height - barHeight / 2, 150, 40, 0x334155)
+    .setInteractive({ useHandCursor: true })
+    .setDepth(301);
+  
+  const moveModeText = this.add.text(width / 2, height - barHeight / 2, '🚶 MOVE MODE', {
+    fontSize: '14px',
+    color: '#94a3b8',
+    fontStyle: 'bold'
+  }).setOrigin(0.5).setDepth(302);
+  
+  moveModeBtn.on('pointerdown', () => this.toggleMoveMode());
+  moveModeBtn.on('pointerover', () => moveModeBtn.setFillStyle(0x475569));
+  moveModeBtn.on('pointerout', () => {
+    moveModeBtn.setFillStyle(this.movementMode ? 0x3b82f6 : 0x334155);
+  });
+  
+  // Camera controls hint (right side)
+  this.add.text(width - 20, height - 30, 'Camera: WASD or Middle Mouse', {
+    fontSize: '11px',
+    color: '#64748b',
+    fontStyle: 'italic'
+  }).setOrigin(1, 0).setDepth(301);
+  
+  this.uiPanels.actionBar = { 
+    bar, 
+    moveModeBtn,
+    moveModeText
+  };
+}
+
+createCombatLogPanel() {
+  const { width } = this.cameras.main;
+  
+  // Panel dimensions
+  const panelWidth = 600;
+  const panelHeight = 160; // Slightly taller
+  const panelX = width / 2;
+  const panelY = 130;
+  
+  // Semi-transparent background
+  const logBg = this.add.rectangle(panelX, panelY, panelWidth, panelHeight, 0x0f172a, 0.92);
+  logBg.setStrokeStyle(2, 0x334155);
+  logBg.setDepth(300);
+  
+  // Title with scroll hint
+  const logTitle = this.add.text(panelX, panelY - panelHeight/2 + 15, '⚔️ COMBAT LOG (Scroll: ↑↓)', {
+    fontSize: '13px',
+    color: '#4ade80',
+    fontStyle: 'bold'
+  }).setOrigin(0.5).setDepth(301);
+  
+  // Create a mask for the scrollable area
+  const maskShape = this.make.graphics();
+  maskShape.fillStyle(0xffffff);
+  maskShape.fillRect(
+    panelX - panelWidth/2 + 10,
+    panelY - panelHeight/2 + 35,
+    panelWidth - 20,
+    panelHeight - 45
+  );
+  
+  const mask = maskShape.createGeometryMask();
+  
+  // Log text container (this will scroll)
+  this.logTextContainer = this.add.container(
+    panelX - panelWidth/2 + 15,
+    panelY - panelHeight/2 + 40
+  );
+  this.logTextContainer.setDepth(301);
+  this.logTextContainer.setMask(mask);
+  
+  // Actual text object inside container
+  this.logText = this.add.text(0, 0, '', {
+    fontSize: '12px',
+    color: '#e2e8f0',
+    lineSpacing: 6,
+    wordWrap: { width: panelWidth - 30 },
+    fontStyle: 'normal'
+  });
+  
+  this.logTextContainer.add(this.logText);
+  
+  // Scroll indicators
+  this.logScrollUpIndicator = this.add.text(panelX + panelWidth/2 - 25, panelY - panelHeight/2 + 40, '▲', {
+    fontSize: '12px',
+    color: '#64748b'
+  }).setDepth(302).setVisible(false);
+  
+  this.logScrollDownIndicator = this.add.text(panelX + panelWidth/2 - 25, panelY + panelHeight/2 - 20, '▼', {
+    fontSize: '12px',
+    color: '#64748b'
+  }).setDepth(302).setVisible(true);
+  
+  // Scroll state
+  this.logScrollOffset = 0;
+  this.logLineHeight = 18; // Approximate height per line
+  
+  // Mouse wheel scrolling
+  this.input.on('wheel', (pointer, gameObjects, deltaX, deltaY, deltaZ) => {
+    if (pointer.x >= panelX - panelWidth/2 && pointer.x <= panelX + panelWidth/2 &&
+        pointer.y >= panelY - panelHeight/2 && pointer.y <= panelY + panelHeight/2) {
+      this.scrollCombatLog(deltaY > 0 ? 1 : -1);
+    }
+  });
+  
+  // Keyboard scrolling (arrow keys)
+  this.input.keyboard.on('keydown-UP', () => this.scrollCombatLog(-1));
+  this.input.keyboard.on('keydown-DOWN', () => this.scrollCombatLog(1));
+  
+  this.uiPanels.combatLog = {
+    bg: logBg,
+    title: logTitle,
+    text: this.logText,
+    container: this.logTextContainer,
+    mask: mask,
+    maxVisibleLines: 6,
+    scrollUpIndicator: this.logScrollUpIndicator,
+    scrollDownIndicator: this.logScrollDownIndicator
+  };
+}
+
   createViewToggle() {
     const { width } = this.cameras.main;
     
@@ -745,6 +835,64 @@ export default class MissionSceneIsometric extends Phaser.Scene {
     
     this.uiPanels.viewToggle = { toggleBtn, toggleText };
   }
+
+  scrollCombatLog(direction) {
+  const maxLines = this.eventLog.length;
+  const visibleLines = this.uiPanels.combatLog.maxVisibleLines;
+  
+  // Can't scroll if everything fits
+  if (maxLines <= visibleLines) {
+    this.logScrollOffset = 0;
+    this.updateScrollIndicators();
+    return;
+  }
+  
+  // Update scroll offset
+  this.logScrollOffset += direction;
+  
+  // Clamp to valid range
+  const maxScroll = Math.max(0, maxLines - visibleLines);
+  this.logScrollOffset = Phaser.Math.Clamp(this.logScrollOffset, 0, maxScroll);
+  
+  // Update text position
+  this.logText.y = -this.logScrollOffset * this.logLineHeight;
+  
+  // Update scroll indicators
+  this.updateScrollIndicators();
+}
+
+updateScrollIndicators() {
+  const maxLines = this.eventLog.length;
+  const visibleLines = this.uiPanels.combatLog.maxVisibleLines;
+  const maxScroll = Math.max(0, maxLines - visibleLines);
+  
+  // Show up arrow if we can scroll up
+  this.logScrollUpIndicator.setVisible(this.logScrollOffset > 0);
+  
+  // Show down arrow if we can scroll down
+  this.logScrollDownIndicator.setVisible(this.logScrollOffset < maxScroll);
+  
+  // Pulse effect on indicators
+  if (this.logScrollUpIndicator.visible) {
+    this.tweens.add({
+      targets: this.logScrollUpIndicator,
+      alpha: 0.3,
+      duration: 500,
+      yoyo: true,
+      repeat: -1
+    });
+  }
+  
+  if (this.logScrollDownIndicator.visible) {
+    this.tweens.add({
+      targets: this.logScrollDownIndicator,
+      alpha: 0.3,
+      duration: 500,
+      yoyo: true,
+      repeat: -1
+    });
+  }
+}
   
   toggleRightPanel() {
     const panel = this.uiPanels.rightPanel;
@@ -893,67 +1041,261 @@ export default class MissionSceneIsometric extends Phaser.Scene {
   }
   
   updateAbilityPanel() {
-    const actor = this.gameSession.getCurrentActor();
-    if (!actor || actor.team !== 'player') {
-      // Hide abilities for enemy turns
-      for (const btnId in this.abilityButtons) {
-        this.abilityButtons[btnId].setVisible(false);
-      }
-      return;
-    }
-    
-    // Show player abilities
-    const abilities = actor.character.abilities.map(id => getAbility(id)).filter(a => a);
-    const { width } = this.cameras.main;
-    const panelX = width - 150;
-    
-    // Clear old buttons
+  const actor = this.gameSession.getCurrentActor();
+  if (!actor || actor.team !== 'player') {
+    // Hide abilities for enemy turns
     for (const btnId in this.abilityButtons) {
-      this.abilityButtons[btnId].destroy();
+      if (this.abilityButtons[btnId].destroy) {
+        this.abilityButtons[btnId].destroy();
+      }
     }
     this.abilityButtons = {};
-    
-    // Create ability buttons
-    abilities.forEach((ability, index) => {
-      const y = 120 + index * 50;
-      
-      const btn = this.add.rectangle(panelX, y, 250, 40, 0x334155)
-        .setInteractive({ useHandCursor: true })
-        .setDepth(301);
-      
-      const text = this.add.text(panelX, y, ability.name, {
-        fontSize: '14px',
-        color: '#ffffff'
-      }).setOrigin(0.5).setDepth(302);
-      
-      btn.on('pointerdown', () => this.selectAbility(ability));
-      btn.on('pointerover', () => btn.setFillStyle(0x475569));
-      btn.on('pointerout', () => btn.setFillStyle(0x334155));
-      
-      this.abilityButtons[ability.id] = btn;
-      this.abilityButtons[ability.id + '_text'] = text;
-    });
+    return;
   }
   
-  selectAbility(ability) {
-    // Exit movement mode if entering ability mode
-    if (this.movementMode) {
-      this.toggleMoveMode();
+  // Show player abilities
+  const abilities = actor.character.abilities.map(id => getAbility(id)).filter(a => a);
+  const { width } = this.cameras.main;
+  const panelX = width - 150;
+  
+  // Clear old buttons
+  for (const btnId in this.abilityButtons) {
+    if (this.abilityButtons[btnId].destroy) {
+      this.abilityButtons[btnId].destroy();
+    }
+  }
+  this.abilityButtons = {};
+  
+  // Create ability buttons with color coding
+  abilities.forEach((ability, index) => {
+    const y = 120 + index * 60;
+    const btnWidth = 260;
+    const btnHeight = 50;
+    
+    // Main button background
+    const btn = this.add.rectangle(panelX, y, btnWidth, btnHeight, 0x334155)
+      .setInteractive({ useHandCursor: true })
+      .setDepth(301);
+    
+    // LEFT TRIM - Action Type Color
+    const actionColor = this.getActionTypeColor(ability.actionType);
+    const leftTrim = this.add.rectangle(
+      panelX - btnWidth/2 + 3,
+      y,
+      6,
+      btnHeight - 4,
+      actionColor
+    ).setDepth(302);
+    
+    // RIGHT TRIM - Resource Type Color
+    const resourceColor = this.getResourceTypeColor(ability.resourceType, ability.resourceCost);
+    const rightTrim = this.add.rectangle(
+      panelX + btnWidth/2 - 3,
+      y,
+      6,
+      btnHeight - 4,
+      resourceColor
+    ).setDepth(302);
+    
+    // Ability name
+    const nameText = this.add.text(panelX - 80, y - 10, ability.name, {
+      fontSize: '14px',
+      color: '#ffffff',
+      fontStyle: 'bold'
+    }).setOrigin(0, 0.5).setDepth(302);
+    
+    // Action type label (small)
+    const actionLabel = this.getActionTypeLabel(ability.actionType);
+    const actionText = this.add.text(panelX - 80, y + 8, actionLabel, {
+      fontSize: '10px',
+      color: '#94a3b8'
+    }).setOrigin(0, 0.5).setDepth(302);
+    
+    // Resource cost (if any)
+    if (ability.resourceCost > 0) {
+      const costLabel = this.getResourceCostLabel(ability.resourceType, ability.resourceCost);
+      const costText = this.add.text(panelX + 110, y, costLabel, {
+        fontSize: '13px',
+        color: this.getResourceTextColor(ability.resourceType),
+        fontStyle: 'bold'
+      }).setOrigin(1, 0.5).setDepth(302);
+      
+      this.abilityButtons[ability.id + '_cost'] = costText;
     }
     
-    this.selectedAbility = ability;
-    this.targetingMode = true;
-    this.targetingAbility = ability;
+    // Range indicator (small icon)
+    const rangeText = this.add.text(panelX + 90, y + 10, `⭘ ${ability.range}`, {
+      fontSize: '9px',
+      color: '#64748b'
+    }).setOrigin(1, 0.5).setDepth(302);
     
-    const actor = this.gameSession.getCurrentActor();
-    this.addLog(`Select target for ${ability.name}...`);
+    // Hover effects
+    btn.on('pointerover', () => {
+      btn.setFillStyle(0x475569);
+      leftTrim.setFillStyle(actionColor, 1);
+      rightTrim.setFillStyle(resourceColor, 1);
+    });
     
-    // Show range
-    const range = ability.range === 'speed' ? actor.remainingSpeed : ability.range;
-    const validMoves = this.grid.calculateMovementRange(actor.x, actor.y, range, true);
-    this.grid.highlightTiles(validMoves, 0x3b82f6, 0.3);
+    btn.on('pointerout', () => {
+      btn.setFillStyle(0x334155);
+      leftTrim.setFillStyle(actionColor, 0.8);
+      rightTrim.setFillStyle(resourceColor, 0.8);
+    });
+    
+    btn.on('pointerdown', () => this.selectAbility(ability));
+    
+    // Store all components
+    this.abilityButtons[ability.id] = btn;
+    this.abilityButtons[ability.id + '_name'] = nameText;
+    this.abilityButtons[ability.id + '_action'] = actionText;
+    this.abilityButtons[ability.id + '_range'] = rangeText;
+    this.abilityButtons[ability.id + '_leftTrim'] = leftTrim;
+    this.abilityButtons[ability.id + '_rightTrim'] = rightTrim;
+  });
+}
+getActionTypeColor(actionType) {
+  switch(actionType) {
+    case 'action': return UI_COLORS.action;           // Green
+    case 'bonus_action': return UI_COLORS.bonusAction; // Red
+    case 'reaction': return UI_COLORS.reaction;        // Purple
+    case 'free': return UI_COLORS.free;               // Gray
+    default: return 0x64748b;                          // Default gray
+  }
+}
+
+getResourceTypeColor(resourceType, cost) {
+  if (!resourceType || cost === 0) return 0x334155; // No resource = dark gray
+  
+  switch(resourceType) {
+    case 'tapas': return UI_COLORS.tapas;  // Orange
+    case 'maya': return UI_COLORS.maya;    // Blue
+    case 'speed': return UI_COLORS.speed;  // Yellow
+    case 'prana': return 0xef4444;         // Red (health cost)
+    default: return 0x64748b;              // Gray
+  }
+}
+
+getResourceTextColor(resourceType) {
+  switch(resourceType) {
+    case 'tapas': return '#fb923c';  // Light orange
+    case 'maya': return '#60a5fa';   // Light blue
+    case 'speed': return '#fcd34d';  // Light yellow
+    case 'prana': return '#f87171';  // Light red
+    default: return '#94a3b8';       // Gray
+  }
+}
+
+getActionTypeLabel(actionType) {
+  switch(actionType) {
+    case 'action': return 'ACTION';
+    case 'bonus_action': return 'BONUS ACTION';
+    case 'reaction': return 'REACTION';
+    case 'free': return 'FREE';
+    default: return '';
+  }
+}
+
+getResourceCostLabel(resourceType, cost) {
+  if (!resourceType || cost === 0) return '';
+  
+  switch(resourceType) {
+    case 'tapas': return `${cost} Tapas`;
+    case 'maya': return `${cost} Māyā`;
+    case 'speed': return `${cost} Speed`;
+    case 'prana': return `${cost} HP`;
+    default: return `${cost}`;
+  }
+}
+  
+  selectAbility(ability) {
+  // Exit movement mode if entering ability mode
+  if (this.movementMode) {
+    this.toggleMoveMode();
   }
   
+  this.selectedAbility = ability;
+  this.targetingMode = true;
+  this.targetingAbility = ability;
+  
+  const actor = this.gameSession.getCurrentActor();
+  this.addLog(`Select target for ${ability.name}...`);
+  
+  // ✅ UPDATED: Show range including potential movement
+  const maxRange = ability.range + actor.remainingSpeed;
+  const validMoves = this.grid.calculateMovementRange(actor.x, actor.y, maxRange, true);
+  this.grid.highlightTiles(validMoves, 0x3b82f6, 0.3);
+}
+
+  
+canReachAndAttack(actor, ability, target) {
+  const distance = calculateDistance(actor.x, actor.y, target.x, target.y);
+  
+  // Already in range - attack directly
+  if (distance <= ability.range) {
+    return {
+      canAttack: true,
+      needsMovement: false,
+      movePath: null
+    };
+  }
+  
+  // Out of range - check if we can move closer
+  const requiredDistance = distance - ability.range;
+  
+  if (requiredDistance > actor.remainingSpeed) {
+    return {
+      canAttack: false,
+      needsMovement: false,
+      message: `Out of range! Need ${requiredDistance} movement, have ${actor.remainingSpeed}.`
+    };
+  }
+  
+  // Calculate closest valid attack position
+  const closestPosition = this.findClosestAttackPosition(actor, target, ability.range);
+  
+  if (!closestPosition) {
+    return {
+      canAttack: false,
+      needsMovement: false,
+      message: 'No valid path to target!'
+    };
+  }
+  
+  return {
+    canAttack: true,
+    needsMovement: true,
+    movePath: closestPosition
+  };
+}
+
+findClosestAttackPosition(actor, target, attackRange) {
+  const validPositions = [];
+  
+  // Check all tiles within movement range
+  for (let dx = -actor.remainingSpeed; dx <= actor.remainingSpeed; dx++) {
+    for (let dy = -actor.remainingSpeed; dy <= actor.remainingSpeed; dy++) {
+      const newX = actor.x + dx;
+      const newY = actor.y + dy;
+      
+      // Check if position is valid
+      if (!this.grid.isValidTile(newX, newY)) continue;
+      if (this.grid.isOccupied(newX, newY)) continue;
+      
+      // Check if this position would be in attack range
+      const distanceToTarget = calculateDistance(newX, newY, target.x, target.y);
+      if (distanceToTarget <= attackRange) {
+        const moveDistance = Math.abs(dx) + Math.abs(dy); // Manhattan distance
+        validPositions.push({ x: newX, y: newY, distance: moveDistance });
+      }
+    }
+  }
+  
+  // Sort by shortest movement distance
+  validPositions.sort((a, b) => a.distance - b.distance);
+  
+  return validPositions.length > 0 ? validPositions[0] : null;
+}
+
   toggleMoveMode() {
     this.movementMode = !this.movementMode;
     
@@ -1052,20 +1394,45 @@ export default class MissionSceneIsometric extends Phaser.Scene {
   }
   
   onCharacterClick(participantId) {
-    // If in movement mode, clicking character does nothing
-    if (this.movementMode) {
-      return;
-    }
+  // If in movement mode, clicking character does nothing
+  if (this.movementMode) {
+    return;
+  }
+  
+  // Handle ability targeting
+  if (!this.targetingMode || !this.targetingAbility) return;
+  
+  const actor = this.gameSession.getCurrentActor();
+  const target = this.participants.find(p => p.id === participantId);
+  
+  if (!target) return;
+  
+  // ✅ NEW: Check if we can reach and attack (with auto-movement)
+  const reachCheck = this.canReachAndAttack(actor, this.targetingAbility, target);
+  
+  if (!reachCheck.canAttack) {
+    this.addLog(`❌ ${reachCheck.message}`);
+    return;
+  }
+  
+  // ✅ NEW: If we need to move first, do it automatically
+  if (reachCheck.needsMovement) {
+    this.addLog(`→ Auto-moving to attack position...`);
     
-    // Handle ability targeting
-    if (!this.targetingMode || !this.targetingAbility) return;
+    // Move the character
+    this.moveCharacter(actor, reachCheck.movePath.x, reachCheck.movePath.y);
     
-    const actor = this.gameSession.getCurrentActor();
-    const target = this.participants.find(p => p.id === participantId);
-    
-    if (!target) return;
-    
-    // Execute ability
+    // Small delay for visual feedback, then attack
+    setTimeout(() => {
+      this.executeAbility(actor, this.targetingAbility, target);
+      
+      // Clear targeting
+      this.grid.clearHighlights();
+      this.targetingMode = false;
+      this.selectedAbility = null;
+    }, 350); // Wait for movement animation
+  } else {
+    // Already in range - attack directly
     this.executeAbility(actor, this.targetingAbility, target);
     
     // Clear targeting
@@ -1073,38 +1440,52 @@ export default class MissionSceneIsometric extends Phaser.Scene {
     this.targetingMode = false;
     this.selectedAbility = null;
   }
+}
+
   
   executeAbility(actor, ability, target) {
-    const result = this.abilitySystem.executeAbility({
-      actorId: actor.id,
-      abilityId: ability.id,
-      primaryTarget: { participantId: target.id }
-    });
+  const result = this.abilitySystem.executeAbility({
+    actorId: actor.id,
+    abilityId: ability.id,
+    primaryTarget: { participantId: target.id }
+  });
+  
+  if (result.success) {
+    this.addLog(result.message);
+    this.updateHealthBars();
     
-    if (result.success) {
-      this.addLog(result.message);
-      this.updateHealthBars();
-      
-      // Check for deaths
-      for (const pid of result.affectedParticipants) {
-        const p = this.participants.find(x => x.id === pid);
-        if (p && p.status === 'downed') {
-          this.handleCharacterDeath(p);
-        }
+    // ✅ NEW: REFRESH ABILITY PANEL after action
+    this.updateAbilityPanel();
+    
+    // ✅ NEW: Update character panel if visible
+    if (this.uiPanels.leftPanel) {
+      const currentActor = this.gameSession.getCurrentActor();
+      if (currentActor) {
+        this.updateLeftPanel(currentActor);
       }
-      
-      // Check victory
-      const combatResult = this.gameSession.checkCombatEnd();
-      if (combatResult) {
-        setTimeout(() => {
-          if (combatResult === 'players_won') this.showVictory();
-          else this.showDefeat();
-        }, 500);
-      }
-    } else {
-      this.addLog(`❌ ${result.message}`);
     }
+    
+    // Check for deaths
+    for (const pid of result.affectedParticipants) {
+      const p = this.participants.find(x => x.id === pid);
+      if (p && p.status === 'downed') {
+        this.handleCharacterDeath(p);
+      }
+    }
+    
+    // Check victory
+    const combatResult = this.gameSession.checkCombatEnd();
+    if (combatResult) {
+      setTimeout(() => {
+        if (combatResult === 'players_won') this.showVictory();
+        else this.showDefeat();
+      }, 500);
+    }
+  } else {
+    this.addLog(`❌ ${result.message}`);
   }
+}
+
   
   handleCharacterDeath(participant) {
     const sprites = this.participantSprites[participant.id];
@@ -1290,8 +1671,36 @@ export default class MissionSceneIsometric extends Phaser.Scene {
   }
   
   addLog(message) {
-    this.eventLog.push(message);
-    if (this.eventLog.length > 5) this.eventLog.shift(); // Show 5 lines now
-    this.logText.setText(this.eventLog.join('\n'));
+  this.eventLog.push(message);
+  
+  // Keep last 20 entries (increased from 6 for scrolling)
+  const maxEntries = 20;
+  if (this.eventLog.length > maxEntries) {
+    this.eventLog.shift();
+    // Adjust scroll offset to maintain position
+    if (this.logScrollOffset > 0) {
+      this.logScrollOffset = Math.max(0, this.logScrollOffset - 1);
+    }
   }
+  
+  // Update log text
+  this.logText.setText(this.eventLog.join('\n'));
+  
+  // Auto-scroll to bottom on new message (unless user has scrolled up)
+  const visibleLines = this.uiPanels.combatLog?.maxVisibleLines || 6;
+  const maxScroll = Math.max(0, this.eventLog.length - visibleLines);
+  
+  // If we were at the bottom, stay at the bottom
+  if (this.logScrollOffset >= maxScroll - 1) {
+    this.logScrollOffset = maxScroll;
+    this.logText.y = -this.logScrollOffset * this.logLineHeight;
+  }
+  
+  // Update scroll indicators
+  this.updateScrollIndicators();
+  
+  console.log(`[Combat Log] ${message}`);
+}
+
+
 }

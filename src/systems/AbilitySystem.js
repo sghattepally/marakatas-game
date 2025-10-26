@@ -1,6 +1,7 @@
 // src/systems/AbilitySystem.js
 // Core ability execution and resolution system for The Marakatas
 // Ported from vyuha VTT ability_system.py
+// UPDATED: Enhanced dice roll logging with full attack details
 
 /**
  * Utility to calculate distance on grid (Chebyshev - 8-directional)
@@ -35,6 +36,18 @@ export function rollDice(diceSpec) {
     total += Phaser.Math.Between(1, diceSpec.sides);
   }
   return total;
+}
+
+/**
+ * Roll dice and return both individual rolls and total
+ */
+export function rollDiceDetailed(diceSpec) {
+  const rolls = [];
+  for (let i = 0; i < diceSpec.dice; i++) {
+    rolls.push(Phaser.Math.Between(1, diceSpec.sides));
+  }
+  const total = rolls.reduce((sum, roll) => sum + roll, 0) + (diceSpec.bonus || 0);
+  return { rolls, total, bonus: diceSpec.bonus || 0 };
 }
 
 export class AbilitySystem {
@@ -208,7 +221,6 @@ export class AbilitySystem {
         };
       }
       
-      
       // Check team alignment
       if (ability.targetType === 'enemy' && actor.team === target.team) {
         return {
@@ -228,22 +240,23 @@ export class AbilitySystem {
         };
       }
 
- let effectiveRange;
-if (ability.range === 'speed') {
-  effectiveRange = actor.remainingSpeed;
-} else {
-  effectiveRange = ability.range;
-}
+      // Check range
+      let effectiveRange;
+      if (ability.range === 'speed') {
+        effectiveRange = actor.remainingSpeed;
+      } else {
+        effectiveRange = ability.range;
+      }
 
-const distance = calculateDistance(actor.x, actor.y, target.x, target.y);
-if (distance > effectiveRange) {  // ← Use effectiveRange, not ability.range
-  return {
-    valid: false,
-    message: `Target out of range (max ${effectiveRange} squares).`,
-    target: null,
-    position: null
-  };
-}
+      const distance = calculateDistance(actor.x, actor.y, target.x, target.y);
+      if (distance > effectiveRange) {
+        return {
+          valid: false,
+          message: `Target out of range (max ${effectiveRange} squares).`,
+          target: null,
+          position: null
+        };
+      }
       
       return {
         valid: true,
@@ -320,76 +333,111 @@ if (distance > effectiveRange) {  // ← Use effectiveRange, not ability.range
   /**
    * Apply damage effect to a target
    * Returns event log entry
+   * UPDATED: Now includes detailed dice roll logging
    */
   applyDamageEffect(actor, target, ability) {
-  // Step 1: Attack Roll (if it's an attack)
-  if (ability.requiresAttackRoll !== false) {  // Default to true
-    const attackRoll = Phaser.Math.Between(1, 20);
-    const attackModifier = actor.character.getModifier(actor.character.dakshata); // Dexterity for attacks
-    const attackTotal = attackRoll + attackModifier;
+    // Get action type for logging
+    const actionTypeDisplay = ability.actionType === 'bonus_action' ? 'BA' : 
+                              ability.actionType === 'reaction' ? 'Reaction' :
+                              ability.actionType === 'free' ? 'Free' : 'Action';
     
-    // Calculate target's evasion (10 + Dakshata modifier)
-    const targetEvasion = 10 + target.character.getModifier(target.character.dakshata);
+    let attackRoll = null;
+    let attackModifier = null;
+    let attackTotal = null;
+    let targetEvasion = null;
+    let isCritical = false;
     
-    console.log(`Attack roll: ${attackRoll} + ${attackModifier} = ${attackTotal} vs Evasion ${targetEvasion}`);
-    
-    // Critical miss
-    if (attackRoll === 1) {
-      return {
-        eventType: 'miss',
-        actor: actor.character.name,
-        target: target.character.name,
-        ability: ability.name,
-        message: 'Critical miss!',
-        damage: 0
-      };
+    // Step 1: Attack Roll (if it's an attack)
+    if (ability.requiresAttackRoll !== false) {  // Default to true
+      attackRoll = Phaser.Math.Between(1, 20);
+      attackModifier = actor.character.getModifier(actor.character.dakshata);
+      attackTotal = attackRoll + attackModifier;
+      
+      // Calculate target's evasion (10 + Dakshata modifier)
+      targetEvasion = 10 + target.character.getModifier(target.character.dakshata);
+      
+      console.log(`Attack roll: ${attackRoll} + ${attackModifier} = ${attackTotal} vs Evasion ${targetEvasion}`);
+      
+      // Critical miss
+      if (attackRoll === 1) {
+        return {
+          eventType: 'miss',
+          actor: actor.character.name,
+          target: target.character.name,
+          ability: ability.name,
+          message: `${actor.character.name} used ${ability.name} [${actionTypeDisplay}]: Rolled ${attackRoll} + ${attackModifier} vs Evasive DC ${targetEvasion} - Critical Miss!`,
+          damage: 0,
+          actionType: ability.actionType
+        };
+      }
+      
+      // Miss
+      if (attackTotal < targetEvasion && attackRoll !== 20) {
+        return {
+          eventType: 'miss',
+          actor: actor.character.name,
+          target: target.character.name,
+          ability: ability.name,
+          message: `${actor.character.name} used ${ability.name} [${actionTypeDisplay}]: Rolled ${attackRoll} + ${attackModifier} vs Evasive DC ${targetEvasion} - Miss!`,
+          damage: 0,
+          actionType: ability.actionType
+        };
+      }
+      
+      // Hit or Critical Hit
+      isCritical = attackRoll === 20;
+      if (isCritical) {
+        console.log('CRITICAL HIT!');
+      }
     }
     
-    // Critical hit
-    if (attackRoll === 20) {
-      console.log('CRITICAL HIT!');
-      // Double damage dice (not modifiers)
+    // Step 2: Roll damage (only if hit or doesn't require attack roll)
+    const diceSpec = parseDiceNotation(ability.damageDice);
+    const damageRoll = rollDiceDetailed(diceSpec);
+    let totalDamage = damageRoll.total;
+    
+    // Add attribute modifier
+    let damageModifier = 0;
+    if (ability.damageAttribute) {
+      damageModifier = actor.character.getModifier(
+        actor.character[ability.damageAttribute]
+      );
+      totalDamage += damageModifier;
     }
     
-    // Miss
-    if (attackTotal < targetEvasion && attackRoll !== 20) {
-      return {
-        eventType: 'miss',
-        actor: actor.character.name,
-        target: target.character.name,
-        ability: ability.name,
-        message: `${actor.character.name} misses ${target.character.name}!`,
-        damage: 0
-      };
+    // Build damage display string
+    const diceRollsDisplay = damageRoll.rolls.join(' + ');
+    const bonusDisplay = damageRoll.bonus > 0 ? ` + ${damageRoll.bonus}` : '';
+    const modifierDisplay = damageModifier !== 0 ? ` + ${damageModifier}` : '';
+    const fullDamageDisplay = `${diceRollsDisplay}${bonusDisplay}${modifierDisplay} = ${totalDamage}`;
+    
+    // Step 3: Apply damage
+    const actualDamage = target.takeDamage(totalDamage);
+    actor.damageDealt += actualDamage;
+    
+    // Build complete message with attack roll info if applicable
+    let message = '';
+    if (ability.requiresAttackRoll !== false) {
+      message = `${actor.character.name} used ${ability.name} [${actionTypeDisplay}]: ` +
+                `Rolled ${attackRoll} + ${attackModifier} vs Evasive DC ${targetEvasion} - ${isCritical ? 'Critical Hit!' : 'Hit!'} > ` +
+                `Damage: ${fullDamageDisplay} → ${actualDamage} damage dealt`;
+    } else {
+      message = `${actor.character.name} used ${ability.name} [${actionTypeDisplay}]: ` +
+                `Damage: ${fullDamageDisplay} → ${actualDamage} damage dealt`;
     }
+    
+    return {
+      eventType: 'damage',
+      actor: actor.character.name,
+      target: target.character.name,
+      ability: ability.name,
+      damage: actualDamage,
+      targetStatus: target.status,
+      remainingPrana: target.currentPrana,
+      message: message,
+      actionType: ability.actionType
+    };
   }
-  
-  // Step 2: Roll damage (only if hit)
-  const diceSpec = parseDiceNotation(ability.damageDice);
-  let totalDamage = rollDice(diceSpec);
-  
-  // Add attribute modifier
-  if (ability.damageAttribute) {
-    const modifier = actor.character.getModifier(
-      actor.character[ability.damageAttribute]
-    );
-    totalDamage += modifier;
-  }
-  
-  // Step 3: Apply damage
-  const actualDamage = target.takeDamage(totalDamage);
-  actor.damageDealt += actualDamage;
-  
-  return {
-    eventType: 'damage',
-    actor: actor.character.name,
-    target: target.character.name,
-    ability: ability.name,
-    damage: actualDamage,
-    targetStatus: target.status,
-    remainingPrana: target.currentPrana
-  };
-}
   
   /**
    * Apply healing effect to a target
@@ -681,9 +729,14 @@ if (distance > effectiveRange) {  // ← Use effectiveRange, not ability.range
       });
     }
     
+    // Use the detailed message from logEvents if available
+    const mainMessage = logEvents.length > 0 && logEvents[0].message 
+      ? logEvents[0].message 
+      : `${actor.character.name} used ${ability.name}!`;
+    
     return {
       success: true,
-      message: `${actor.character.name} used ${ability.name}!`,
+      message: mainMessage,
       logEvents: logEvents,
       affectedParticipants: affectedParticipants
     };

@@ -150,7 +150,7 @@ export default class MissionSelectScene extends Phaser.Scene {
     });
 
     playButton.on('pointerdown', () => {
-      this.scene.start('MissionScene', {
+      this.scene.start('MissionSceneIsometric', {
         missionId: mission.id,
         difficulty: selectedDifficulty
       });

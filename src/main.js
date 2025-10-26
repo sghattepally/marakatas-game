@@ -9,10 +9,10 @@ import { GameConfig } from './config.js';
 import BootScene from './scenes/BootScene.js';
 import MainMenu from './scenes/MainMenu.js';
 import MissionSelectScene from './scenes/MissionSelectScene.js';
-import MissionScene from './scenes/MissionScene.js';
+import MissionSceneIsometric from './scenes/MissionScene_Isometric.js';
 
 // Add all scenes to config
-GameConfig.scene = [BootScene, MainMenu, MissionSelectScene, MissionScene];
+GameConfig.scene = [BootScene, MainMenu, MissionSelectScene, MissionSceneIsometric];
 
 const game = new Phaser.Game(GameConfig);
 window.game = game;
